@@ -1,0 +1,37 @@
+﻿; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but for an iOS export it contains all necessary platform configurations.
+
+config_version=5
+
+[application]
+
+config/name="Slay the Spire 2"
+config/description="Slay the Spire 2 iOS Port"
+run/main_scene="res://Bootstrap.tscn"
+config/features=PackedStringArray("4.5", "C#", "Mobile")
+config/icon="res://icon.png"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=0
+window/size/resizable=true
+window/handheld/orientation=6
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=true
+
+[dotnet]
+
+project/assembly_name="STS2iOS"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

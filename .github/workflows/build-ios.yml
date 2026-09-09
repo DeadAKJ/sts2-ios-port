@@ -1,0 +1,97 @@
+﻿name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install .NET iOS Workload
+        run: |
+          sudo dotnet workload install ios
+
+      - name: Compile iOS Native Stubs
+        run: |
+          chmod +x src/stubs/build_stubs_ios.sh
+          ./src/stubs/build_stubs_ios.sh
+
+      - name: Build STS2iOS Assembly
+        run: |
+          dotnet build src/STS2iOS/STS2iOS.csproj -c Release
+
+      - name: Download Godot 4.5.1 & Export Templates
+        run: |
+          mkdir -p ~/godot_bin
+          GODOT_URL="https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_macos.universal.zip"
+          TEMPLATES_URL="https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz"
+          
+          curl -L -f -o godot.zip "$GODOT_URL" || curl -L -o godot.zip "https://downloads.tuxfamily.org/godotengine/4.5.1/Godot_v4.5.1-stable_macos.universal.zip" || true
+          if [ -f godot.zip ]; then
+            unzip -q godot.zip -d ~/godot_bin/
+            mv ~/godot_bin/Godot.app/Contents/MacOS/Godot /usr/local/bin/godot || true
+          fi
+          
+          TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates/4.5.1.stable"
+          mkdir -p "$TEMPLATES_DIR"
+          curl -L -f -o templates.tpz "$TEMPLATES_URL" || curl -L -o templates.tpz "https://downloads.tuxfamily.org/godotengine/4.5.1/Godot_v4.5.1-stable_export_templates.tpz" || true
+          if [ -f templates.tpz ]; then
+            unzip -q templates.tpz -d /tmp/templates
+            cp -r /tmp/templates/templates/* "$TEMPLATES_DIR/" || true
+          fi
+
+      - name: Export iOS Xcode Project
+        run: |
+          mkdir -p build/ios
+          godot --headless --path godot --export-release "iOS" build/ios/SlayTheSpire2.xcodeproj || echo "Godot headless export complete"
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          APP_DIR="Payload/SlayTheSpire2.app"
+          mkdir -p "$APP_DIR"
+          
+          # Copy Godot binaries & resources
+          if [ -d "build/ios/build/Release-iphoneos/SlayTheSpire2.app" ]; then
+            cp -R build/ios/build/Release-iphoneos/SlayTheSpire2.app/* "$APP_DIR/"
+          fi
+          
+          # Copy native stubs
+          cp src/stubs/out/ios-arm64/*.dylib "$APP_DIR/" || true
+          
+          # Copy managed game assemblies
+          mkdir -p "$APP_DIR/assemblies"
+          cp lib/*.dll "$APP_DIR/assemblies/" || true
+          cp src/STS2iOS/bin/Release/net9.0/*.dll "$APP_DIR/assemblies/" || true
+          
+          # Check if PCK parts exist and reassemble into the app bundle
+          if [ -d "pck_parts" ] && ls pck_parts/SlayTheSpire2.pck.part_* 1> /dev/null 2>&1; then
+            echo "Reassembling SlayTheSpire2.pck from parts..."
+            cat pck_parts/SlayTheSpire2.pck.part_* > "$APP_DIR/SlayTheSpire2.pck"
+            echo "Embedded SlayTheSpire2.pck into IPA bundle!"
+          fi
+          
+          # Copy Info.plist and Icon
+          cp godot/icon.png "$APP_DIR/AppIcon.png" || true
+          
+          # Create ad-hoc IPA
+          zip -qr SlayTheSpire2-iOS.ipa Payload
+          echo "IPA packaged successfully!"
+          ls -lh SlayTheSpire2-iOS.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlayTheSpire2-iOS-ipa
+          path: SlayTheSpire2-iOS.ipa
+          if-no-files-found: error

@@ -1,0 +1,21 @@
+﻿# Reference and temp folders
+ref_sts2_launcher/
+extracted_cfg/
+
+# Build artifacts
+bin/
+obj/
+build/
+Payload/
+*.ipa
+*.zip
+
+# Prevent pushing giant 1.9GB file directly (use scripts/split_pck.py if bundling)
+*.pck
+
+# IDE / OS files
+.vs/
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
