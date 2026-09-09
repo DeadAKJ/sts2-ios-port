@@ -5,6 +5,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+env:
+  UseSharedCompilation: false
+  DOTNET_CLI_DO_NOT_USE_GLOBAL_BUILD_SERVERS: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+
 jobs:
   build:
     runs-on: macos-14
@@ -54,13 +59,20 @@ jobs:
           curl -L -f -o templates.tpz "$TEMPLATES_URL"
           unzip -q templates.tpz -d /tmp/templates_unzipped
           cp -r /tmp/templates_unzipped/templates/* "$TEMPLATES_DIR/"
-          echo "Export templates installed to $TEMPLATES_DIR:"
-          ls -la "$TEMPLATES_DIR"
+          echo "Export templates installed."
 
       - name: Export iOS Xcode Project
+        timeout-minutes: 5
         run: |
           mkdir -p build/ios
-          godot --headless --path godot --export-release "iOS" build/ios/SlayTheSpire2.xcodeproj || true
+          echo "Initializing editor cache..."
+          godot --headless --path godot --editor --quit || true
+          
+          echo "Exporting Xcode project..."
+          godot --headless --verbose --path godot --export-release "iOS" build/ios/SlayTheSpire2.xcodeproj || true
+          
+          # Shut down any background build servers that might hold process locks
+          dotnet build-server shutdown || true
           ls -la build/ios
 
       - name: Build with xcodebuild

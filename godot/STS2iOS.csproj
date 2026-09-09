@@ -5,6 +5,8 @@
     <Nullable>disable</Nullable>
     <AssemblyName>STS2iOS</AssemblyName>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
