@@ -35,54 +35,40 @@ jobs:
         run: |
           dotnet build godot/STS2iOS.csproj -c Release
 
-      - name: Download Godot 4.5.2 Mono & iOS Export Templates
+      - name: Download Godot 4.5.2 iOS Template
         run: |
-          mkdir -p ~/godot_bin
-          GODOT_URL="https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_mono_macos.universal.zip"
+          mkdir -p /tmp/templates_unzipped build/ios
           TEMPLATES_URL="https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_mono_export_templates.tpz"
 
-          echo "Downloading Godot 4.5.2 Mono..."
-          curl -L -f -o godot.zip "$GODOT_URL"
-          unzip -q godot.zip -d ~/godot_bin/
-          
-          GODOT_EXE=$(find ~/godot_bin -name "Godot" -type f -perm +111 | head -n 1)
-          if [ -z "$GODOT_EXE" ]; then
-            GODOT_EXE=$(find ~/godot_bin -name "Godot_mono" -type f | head -n 1)
-          fi
-          echo "Godot binary located at: $GODOT_EXE"
-          sudo cp "$GODOT_EXE" /usr/local/bin/godot
-          sudo chmod +x /usr/local/bin/godot
-          
-          TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates/4.5.2.stable.mono"
-          mkdir -p "$TEMPLATES_DIR"
-          echo "Downloading export templates..."
+          echo "Downloading Godot 4.5.2 export templates..."
           curl -L -f -o templates.tpz "$TEMPLATES_URL"
           unzip -q templates.tpz -d /tmp/templates_unzipped
-          cp -r /tmp/templates_unzipped/templates/* "$TEMPLATES_DIR/"
-          echo "Export templates installed."
-
-      - name: Export iOS Xcode Project
-        timeout-minutes: 5
-        run: |
-          mkdir -p build/ios
-          echo "Initializing editor cache..."
-          godot --headless --path godot --editor --quit || true
           
-          echo "Exporting Xcode project..."
-          godot --headless --verbose --path godot --export-release "iOS" build/ios/SlayTheSpire2.xcodeproj || true
+          # Extract the official iOS Xcode project template directly
+          if [ -f "/tmp/templates_unzipped/templates/ios.zip" ]; then
+            echo "Extracting official Godot iOS Xcode project template..."
+            unzip -q /tmp/templates_unzipped/templates/ios.zip -d build/ios/
+          else
+            echo "ios.zip not found, searching templates..."
+            find /tmp/templates_unzipped -name "*ios*"
+          fi
           
-          # Shut down any background build servers that might hold process locks
-          dotnet build-server shutdown || true
           ls -la build/ios
 
-      - name: Build with xcodebuild
+      - name: Build Xcode Project with xcodebuild
         run: |
-          if [ -d "build/ios/SlayTheSpire2.xcodeproj" ]; then
-            echo "Building Xcode project..."
-            cd build/ios
+          cd build/ios
+          XCODEPROJ=$(find . -name "*.xcodeproj" -maxdepth 2 | head -n 1)
+          echo "Found Xcode project: $XCODEPROJ"
+          
+          if [ -n "$XCODEPROJ" ]; then
+            SCHEME=$(xcodebuild -list -project "$XCODEPROJ" | grep -A 1 "Schemes:" | tail -n 1 | tr -d ' ')
+            if [ -z "$SCHEME" ]; then SCHEME="godot_ios"; fi
+            echo "Building scheme: $SCHEME"
+            
             xcodebuild \
-              -project SlayTheSpire2.xcodeproj \
-              -scheme "Slay the Spire 2" \
+              -project "$XCODEPROJ" \
+              -scheme "$SCHEME" \
               -configuration Release \
               -destination "generic/platform=iOS" \
               -archivePath SlayTheSpire2.xcarchive \
@@ -90,27 +76,24 @@ jobs:
               CODE_SIGNING_ALLOWED=NO \
               CODE_SIGNING_REQUIRED=NO \
               CODE_SIGN_IDENTITY="" || true
-            cd ../..
           fi
+          cd ../..
 
       - name: Package IPA
         run: |
-          mkdir -p Payload
+          mkdir -p Payload/SlayTheSpire2.app
           APP_DIR="Payload/SlayTheSpire2.app"
-          mkdir -p "$APP_DIR"
           
-          # 1. Copy compiled .app from Xcode archive if present
-          ARCHIVED_APP=$(find build -name "*.app" -type d 2>/dev/null | head -n 1)
+          # 1. Copy compiled .app contents if available
+          ARCHIVED_APP=$(find build/ios -name "*.app" -type d 2>/dev/null | head -n 1)
           if [ -n "$ARCHIVED_APP" ] && [ -d "$ARCHIVED_APP" ]; then
-            echo "Found compiled app at $ARCHIVED_APP, copying..."
+            echo "Copying compiled app from $ARCHIVED_APP..."
             cp -R "$ARCHIVED_APP/"* "$APP_DIR/"
           fi
           
-          # 2. Always ensure Info.plist is present
-          if [ ! -f "$APP_DIR/Info.plist" ]; then
-            echo "Copying fallback Info.plist..."
-            cp godot/Info.plist "$APP_DIR/Info.plist"
-          fi
+          # 2. Always install verified Info.plist
+          echo "Installing Info.plist..."
+          cp godot/Info.plist "$APP_DIR/Info.plist"
           
           # 3. Copy iOS native stubs
           mkdir -p "$APP_DIR/Frameworks"
@@ -124,29 +107,30 @@ jobs:
           cp lib/*.dll "$APP_DIR/" 2>/dev/null || true
           cp godot/bin/Release/net9.0/*.dll "$APP_DIR/" 2>/dev/null || true
           
-          # 5. Check if PCK parts exist and reassemble
+          # 5. Copy executable binary if missing
+          if [ ! -f "$APP_DIR/SlayTheSpire2" ]; then
+            TEMPLATE_BIN=$(find build/ios /tmp/templates_unzipped -name "*template*release*arm64*" -o -name "*godot_ios*" 2>/dev/null | grep -v "\.a$" | grep -v "\.zip$" | head -n 1)
+            if [ -n "$TEMPLATE_BIN" ] && [ -f "$TEMPLATE_BIN" ]; then
+              echo "Installing engine binary from $TEMPLATE_BIN..."
+              cp "$TEMPLATE_BIN" "$APP_DIR/SlayTheSpire2"
+              chmod +x "$APP_DIR/SlayTheSpire2"
+            fi
+          fi
+          
+          # 6. Reassemble PCK parts if present
           if [ -d "pck_parts" ] && ls pck_parts/SlayTheSpire2.pck.part_* 1> /dev/null 2>&1; then
             echo "Reassembling SlayTheSpire2.pck from parts..."
             cat pck_parts/SlayTheSpire2.pck.part_* > "$APP_DIR/SlayTheSpire2.pck"
             echo "Embedded SlayTheSpire2.pck into IPA bundle!"
           fi
           
-          # 6. Copy Icon
+          # 7. Copy App Icon
           cp godot/icon.png "$APP_DIR/AppIcon.png" 2>/dev/null || true
           cp godot/icon.png "$APP_DIR/AppIcon60x60@2x.png" 2>/dev/null || true
           
-          # 7. Check if binary exists, if not use template binary from templates
-          if [ ! -f "$APP_DIR/SlayTheSpire2" ]; then
-            TEMPLATE_BIN=$(find "$HOME/Library/Application Support/Godot/export_templates" -name "*iphone*" -o -name "*ios*" 2>/dev/null | grep -E "bin|template" | head -n 1)
-            if [ -n "$TEMPLATE_BIN" ] && [ -f "$TEMPLATE_BIN" ]; then
-              cp "$TEMPLATE_BIN" "$APP_DIR/SlayTheSpire2"
-              chmod +x "$APP_DIR/SlayTheSpire2"
-            fi
-          fi
-          
-          # 8. Create IPA
+          # 8. Package into final IPA
           zip -qr SlayTheSpire2-iOS.ipa Payload
-          echo "IPA packaged successfully!"
+          echo "IPA packaged successfully:"
           ls -lh SlayTheSpire2-iOS.ipa
           
           # Verify Info.plist inside IPA
