@@ -30,30 +30,24 @@ jobs:
         run: |
           dotnet build godot/STS2iOS.csproj -c Release
 
-      - name: Download Godot 4.5.2 Mono & iOS Export Templates
+      - name: Download Godot 4.5.2 & iOS Export Templates
         run: |
           mkdir -p ~/godot_bin
-          GODOT_URL="https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_mono_macos.universal.zip"
-          TEMPLATES_URL="https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_mono_export_templates.tpz"
+          GODOT_URL="https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_macos.universal.zip"
+          TEMPLATES_URL="https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_export_templates.tpz"
 
-          echo "Downloading Godot 4.5.2 Mono..."
+          echo "Downloading Godot 4.5.2 Standard..."
           curl -L -f -o godot.zip "$GODOT_URL"
           unzip -q godot.zip -d ~/godot_bin/
           
-          APP_BUNDLE=$(find ~/godot_bin -name "*.app" -type d | head -n 1)
-          echo "Found app bundle: $APP_BUNDLE"
-          sudo cp -R "$APP_BUNDLE" /Applications/Godot.app
+          GODOT_EXE=$(find ~/godot_bin -name "Godot" -type f -perm +111 | head -n 1)
+          echo "Godot binary located at: $GODOT_EXE"
+          sudo cp "$GODOT_EXE" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
           
-          # Use a wrapper script instead of a symlink to prevent GodotSharp path resolution hang
-          echo '#!/bin/bash' > /tmp/godot
-          echo 'exec /Applications/Godot.app/Contents/MacOS/Godot "$@"' >> /tmp/godot
-          chmod +x /tmp/godot
-          sudo mv /tmp/godot /usr/local/bin/godot
-          /usr/local/bin/godot --version
-          
-          TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates/4.5.2.stable.mono"
+          TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates/4.5.2.stable"
           mkdir -p "$TEMPLATES_DIR"
-          echo "Downloading Godot 4.5.2 Mono export templates..."
+          echo "Downloading Godot 4.5.2 export templates..."
           curl -L -f -o templates.tpz "$TEMPLATES_URL"
           unzip -q templates.tpz -d /tmp/templates_unzipped
           cp -r /tmp/templates_unzipped/templates/* "$TEMPLATES_DIR/"
@@ -61,14 +55,11 @@ jobs:
           ls -la "$TEMPLATES_DIR"
 
       - name: Export iOS Xcode Project
-        env:
-          DOTNET_CLI_DO_NOT_USE_GLOBAL_BUILD_SERVERS: 1
-          UseSharedCompilation: false
         run: |
           mkdir -p build/ios godot/build/ios
           ROOT_DIR="$(pwd)"
           cd godot
-          /Applications/Godot.app/Contents/MacOS/Godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj"
+          godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj"
           cd ..
           if [ -d "godot/build/ios/SlayTheSpire2.xcodeproj" ]; then
             cp -R godot/build/ios/* build/ios/
