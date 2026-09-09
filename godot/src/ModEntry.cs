@@ -42,7 +42,6 @@ public static class ModEntry
         }
     }
 
-    [UnmanagedCallersOnly]
     public static void Apply()
     {
         if (_applied)
@@ -70,7 +69,6 @@ public static class ModEntry
             EarlyAccessDisclaimerPatches.Apply(_harmony);
             CombatBackgroundPatches.Apply(_harmony);
             LanMultiplayerPatcher.Apply(_harmony);
-            ModLoaderPatches.Apply(_harmony);
             SaveDiagnosticPatches.Apply(_harmony);
 
             PatchHelper.Log("All iOS game patches applied successfully.");
