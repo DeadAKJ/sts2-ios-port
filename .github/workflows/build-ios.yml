@@ -23,12 +23,12 @@ jobs:
 
       - name: Compile iOS Native Stubs
         run: |
-          chmod +x src/stubs/build_stubs_ios.sh
-          ./src/stubs/build_stubs_ios.sh
+          chmod +x stubs/build_stubs_ios.sh
+          ./stubs/build_stubs_ios.sh
 
       - name: Build STS2iOS Assembly
         run: |
-          dotnet build src/STS2iOS/STS2iOS.csproj -c Release
+          dotnet build godot/STS2iOS.csproj -c Release
 
       - name: Download Godot 4.5.1 & Export Templates
         run: |
@@ -67,12 +67,12 @@ jobs:
           fi
           
           # Copy native stubs
-          cp src/stubs/out/ios-arm64/*.dylib "$APP_DIR/" || true
+          cp stubs/out/ios-arm64/*.dylib "$APP_DIR/" || true
           
           # Copy managed game assemblies
           mkdir -p "$APP_DIR/assemblies"
           cp lib/*.dll "$APP_DIR/assemblies/" || true
-          cp src/STS2iOS/bin/Release/net9.0/*.dll "$APP_DIR/assemblies/" || true
+          cp godot/bin/Release/net9.0/*.dll "$APP_DIR/assemblies/" || true
           
           # Check if PCK parts exist and reassemble into the app bundle
           if [ -d "pck_parts" ] && ls pck_parts/SlayTheSpire2.pck.part_* 1> /dev/null 2>&1; then

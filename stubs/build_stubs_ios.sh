@@ -1,8 +1,11 @@
 ﻿#!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
 SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-OUT_DIR="$(cd "$(dirname "$0")" && pwd)/out/ios-arm64"
+OUT_DIR="$SCRIPT_DIR/out/ios-arm64"
 mkdir -p "$OUT_DIR"
 
 echo "Compiling Steamworks stub for iOS arm64..."

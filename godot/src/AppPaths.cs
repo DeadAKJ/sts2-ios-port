@@ -12,6 +12,9 @@ public static class AppPaths
     public static string SavesDir => ProjectSettings.GlobalizePath("user://Saves");
     public static string PckPath => ProjectSettings.GlobalizePath("user://SlayTheSpire2.pck");
 
+    public static string ExternalModsDir => ModsDir;
+    public static string ExternalSaveBackupsDir => SavesDir;
+
     public static bool HasStoragePermission() => true;
 
     public static void EnsureDirectories()
