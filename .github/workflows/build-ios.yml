@@ -43,8 +43,13 @@ jobs:
           APP_BUNDLE=$(find ~/godot_bin -name "*.app" -type d | head -n 1)
           echo "Found app bundle: $APP_BUNDLE"
           sudo cp -R "$APP_BUNDLE" /Applications/Godot.app
-          sudo ln -sf /Applications/Godot.app/Contents/MacOS/Godot /usr/local/bin/godot
-          godot --version
+          
+          # Use a wrapper script instead of a symlink to prevent GodotSharp path resolution hang
+          echo '#!/bin/bash' > /tmp/godot
+          echo 'exec /Applications/Godot.app/Contents/MacOS/Godot "$@"' >> /tmp/godot
+          chmod +x /tmp/godot
+          sudo mv /tmp/godot /usr/local/bin/godot
+          /usr/local/bin/godot --version
           
           TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates/4.5.2.stable.mono"
           mkdir -p "$TEMPLATES_DIR"
@@ -63,7 +68,7 @@ jobs:
           mkdir -p build/ios godot/build/ios
           ROOT_DIR="$(pwd)"
           cd godot
-          godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj"
+          /Applications/Godot.app/Contents/MacOS/Godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj"
           cd ..
           if [ -d "godot/build/ios/SlayTheSpire2.xcodeproj" ]; then
             cp -R godot/build/ios/* build/ios/
