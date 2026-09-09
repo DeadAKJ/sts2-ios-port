@@ -12,10 +12,6 @@ run/main_scene="res://Bootstrap.tscn"
 config/features=PackedStringArray("4.5", "C#", "Mobile")
 config/icon="res://icon.png"
 
-[autoload]
-
-PatchLoader="*res://src/PatchLoader.cs"
-
 [display]
 
 window/size/viewport_width=1920

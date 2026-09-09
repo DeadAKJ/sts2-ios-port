@@ -39,7 +39,11 @@ func update_status(message: String, progress: float) -> void:
 
 func launch_game() -> void:
 	update_status("Launching Slay the Spire 2...", 1.0)
+	ProjectSettings.set_setting("input_devices/pointing/emulate_mouse_from_touch", true)
+	ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
+	
 	var candidate_scenes = [
+		"res://scenes/screens/main_menu.tscn",
 		"res://scenes/game.tscn",
 		"res://main.tscn",
 		"res://src/main.tscn"
