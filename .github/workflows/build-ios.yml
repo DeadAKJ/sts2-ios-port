@@ -56,8 +56,14 @@ jobs:
 
       - name: Export iOS Xcode Project
         run: |
-          mkdir -p build/ios
-          godot --headless --path godot --export-release "iOS" build/ios/SlayTheSpire2.xcodeproj
+          mkdir -p build/ios godot/build/ios
+          ROOT_DIR="$(pwd)"
+          cd godot
+          godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj"
+          cd ..
+          if [ -d "godot/build/ios/SlayTheSpire2.xcodeproj" ]; then
+            cp -R godot/build/ios/* build/ios/
+          fi
           ls -la build/ios
 
       - name: Build Xcode Project with xcodebuild
