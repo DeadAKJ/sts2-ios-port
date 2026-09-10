@@ -36,7 +36,7 @@ void SteamAPI_SetTryCatchCallbacks(int bTryCatchCallbacks) {}
 void SteamAPI_WriteMiniDump(uint32_t uStructuredExceptionCode, void *pvExceptionInfo, uint32_t uBuildID) {}
 void SteamAPI_SetMiniDumpComment(const char *pchMsg) {}
 
-int SteamAPI_IsSteamRunning(void) { return 0; }
+int SteamAPI_IsSteamRunning(void) { return 1; }
 int32_t SteamAPI_GetSteamInstallPath(void) { return 0; }
 int32_t SteamAPI_GetHSteamPipe(void) { return 1; }
 int32_t SteamAPI_GetHSteamUser(void) { return 1; }

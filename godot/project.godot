@@ -27,6 +27,10 @@ window/stretch/aspect="expand"
 pointing/emulate_touch_from_mouse=true
 pointing/emulate_mouse_from_touch=true
 
+[autoload]
+
+STS2Bootstrapper="*res://src/STS2Bootstrapper.cs"
+
 [dotnet]
 
 project/assembly_name="STS2iOS"

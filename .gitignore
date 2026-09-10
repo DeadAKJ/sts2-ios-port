@@ -2,6 +2,7 @@
 ref_sts2_launcher/
 extracted_cfg/
 godot/src_harmony_disabled/
+scratch/
 
 # Build artifacts
 bin/

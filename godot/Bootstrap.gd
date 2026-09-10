@@ -49,6 +49,11 @@ func launch_game() -> void:
 	ProjectSettings.set_setting("input_devices/pointing/emulate_mouse_from_touch", true)
 	ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
 	
+	if has_node("/root/STS2Bootstrapper"):
+		get_node("/root/STS2Bootstrapper").call("EnsureRegistered")
+	elif has_node("STS2Bootstrapper"):
+		get_node("STS2Bootstrapper").call("EnsureRegistered")
+	
 	var candidate_scenes = [
 		"res://scenes/game.tscn",
 		"res://scenes/screens/main_menu.tscn",
