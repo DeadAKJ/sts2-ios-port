@@ -61,6 +61,8 @@ jobs:
 
       - name: Build STS2iOS Assembly
         run: |
+          mkdir -p godot/lib
+          cp -R lib/* godot/lib/
           dotnet build godot/STS2iOS.csproj -c Release
 
       - name: Export iOS Xcode Project
@@ -71,12 +73,12 @@ jobs:
           mkdir -p build/ios godot/build/ios
           ROOT_DIR="$(pwd)"
           cd godot
-          /Applications/Godot.app/Contents/MacOS/Godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj" || true
+          /Applications/Godot.app/Contents/MacOS/Godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj" || {
+            echo "ERROR: Godot iOS export failed! Printing MSBuild logs:"
+            find "$HOME/Library/Application Support/Godot/mono/build_logs" -name "msbuild_log.txt" -exec cat {} + 2>/dev/null || true
+            exit 1
+          }
           cd ..
-          
-          # Print any msbuild export failure logs
-          echo "Checking MSBuild export logs..."
-          find "$HOME/Library/Application Support/Godot/mono/build_logs" -name "msbuild_log.txt" -exec cat {} + 2>/dev/null || true
           
           if [ -d "godot/build/ios/SlayTheSpire2.xcodeproj" ]; then
             cp -R godot/build/ios/* build/ios/

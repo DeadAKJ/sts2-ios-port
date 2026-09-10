@@ -8,56 +8,71 @@
     <UseSharedCompilation>false</UseSharedCompilation>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
+
   <ItemGroup>
     <TrimmerRootAssembly Include="sts2" />
     <TrimmerRootAssembly Include="GodotSharp" />
     <TrimmerRootAssembly Include="$(TargetName)" />
   </ItemGroup>
+
   <ItemGroup>
     <Reference Include="sts2">
-      <HintPath>../lib/sts2.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/sts2.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(MSBuildThisFileDirectory)lib/0Harmony.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="MonoMod.Backports">
+      <HintPath>$(MSBuildThisFileDirectory)lib/MonoMod.Backports.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="MonoMod.ILHelpers">
+      <HintPath>$(MSBuildThisFileDirectory)lib/MonoMod.ILHelpers.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Steamworks.NET">
-      <HintPath>../lib/Steamworks.NET.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/Steamworks.NET.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Sentry">
-      <HintPath>../lib/Sentry.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/Sentry.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="SmartFormat">
-      <HintPath>../lib/SmartFormat.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/SmartFormat.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="SmartFormat.ZString">
-      <HintPath>../lib/SmartFormat.ZString.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/SmartFormat.ZString.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Vortice.DXGI">
-      <HintPath>../lib/Vortice.DXGI.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/Vortice.DXGI.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Vortice.DirectX">
-      <HintPath>../lib/Vortice.DirectX.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/Vortice.DirectX.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="Vortice.Mathematics">
-      <HintPath>../lib/Vortice.Mathematics.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/Vortice.Mathematics.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="SharpGen.Runtime">
-      <HintPath>../lib/SharpGen.Runtime.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/SharpGen.Runtime.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="SharpGen.Runtime.COM">
-      <HintPath>../lib/SharpGen.Runtime.COM.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/SharpGen.Runtime.COM.dll</HintPath>
+      <Private>true</Private>
     </Reference>
     <Reference Include="System.IO.Hashing">
-      <HintPath>../lib/System.IO.Hashing.dll</HintPath>
-      <Private>false</Private>
+      <HintPath>$(MSBuildThisFileDirectory)lib/System.IO.Hashing.dll</HintPath>
+      <Private>true</Private>
     </Reference>
   </ItemGroup>
 </Project>
