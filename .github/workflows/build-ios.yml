@@ -59,6 +59,20 @@ jobs:
           echo "Export templates installed to $TEMPLATES_DIR:"
           ls -la "$TEMPLATES_DIR"
 
+      - name: Setup Spine GDExtension for iOS
+        run: |
+          mkdir -p /tmp/spine_ext
+          SPINE_URL="https://spine-godot.s3.eu-central-1.amazonaws.com/4.2/4.5.1-stable/spine-godot-extension-4.2-4.5.1-stable.zip"
+          echo "Downloading Spine GDExtension from $SPINE_URL..."
+          curl -L -f -o /tmp/spine_ext/spine.zip "$SPINE_URL"
+          unzip -q /tmp/spine_ext/spine.zip -d /tmp/spine_ext
+          mkdir -p godot/addons/spine/ios
+          cp /tmp/spine_ext/bin/spine_godot_extension.gdextension godot/addons/spine/
+          cp -R /tmp/spine_ext/bin/ios/* godot/addons/spine/ios/
+          echo "Installed Spine GDExtension to godot/addons/spine:"
+          ls -la godot/addons/spine
+          ls -la godot/addons/spine/ios
+
       - name: Build STS2iOS Assembly
         run: |
           mkdir -p godot/lib
@@ -150,7 +164,16 @@ jobs:
           cp stubs/out/ios-arm64/*.dylib "$APP_DIR/" 2>/dev/null || true
           cp "$APP_DIR/Frameworks/libsteam_api.dylib" "$APP_DIR/Frameworks/libsteam_api64.dylib" 2>/dev/null || true
           cp "$APP_DIR/libsteam_api.dylib" "$APP_DIR/libsteam_api64.dylib" 2>/dev/null || true
-          
+
+          # 4b. Embed Spine GDExtension Framework
+          if [ -d "godot/addons/spine/ios/libspine_godot.ios.template_release.framework" ]; then
+            echo "Embedding Spine framework into $APP_DIR/Frameworks/..."
+            cp -R godot/addons/spine/ios/libspine_godot.ios.template_release.framework "$APP_DIR/Frameworks/"
+          fi
+          mkdir -p "$APP_DIR/addons/spine/ios"
+          cp godot/addons/spine/spine_godot_extension.gdextension "$APP_DIR/addons/spine/" 2>/dev/null || true
+          cp -R godot/addons/spine/ios/* "$APP_DIR/addons/spine/ios/" 2>/dev/null || true
+
           # 5. Copy managed game assemblies
           mkdir -p "$APP_DIR/assemblies"
           cp lib/*.dll "$APP_DIR/assemblies/" 2>/dev/null || true

@@ -346,6 +346,79 @@ public partial class STS2Bootstrapper : Node
 
                 GD.PrintErr("[STS2Bootstrapper] Successfully pre-initialized NBossMapPoint children and fields!");
             }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NCreature nCreature)
+            {
+                if (nCreature.Visuals == null)
+                {
+                    GD.PrintErr($"[STS2Bootstrapper] NCreature {nCreature.Name} has null Visuals, instantiating fallback visuals...");
+                    try
+                    {
+                        var fallbackScene = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache.GetScene("res://scenes/creature_visuals/fallback.tscn");
+                        if (fallbackScene != null)
+                        {
+                            nCreature.Visuals = fallbackScene.Instantiate<MegaCrit.Sts2.Core.Nodes.Combat.NCreatureVisuals>(PackedScene.GenEditState.Disabled);
+                        }
+                    }
+                    catch (Exception fex)
+                    {
+                        GD.PrintErr($"[STS2Bootstrapper] Failed to instantiate fallback visuals: {fex.Message}");
+                    }
+                }
+
+                if (nCreature.Visuals != null)
+                {
+                    if (nCreature.Visuals.VfxSpawnPosition == null)
+                    {
+                        var centerPos = nCreature.Visuals.GetNodeOrNull<Marker2D>("%CenterPos")
+                                     ?? nCreature.Visuals.GetNodeOrNull<Marker2D>("CenterPos")
+                                     ?? new Marker2D { Name = "CenterPos" };
+                        if (!centerPos.IsInsideTree())
+                        {
+                            nCreature.Visuals.AddChild(centerPos);
+                        }
+                        nCreature.Visuals.VfxSpawnPosition = centerPos;
+                        GD.PrintErr($"[STS2Bootstrapper] Guarded VfxSpawnPosition on {nCreature.Name}");
+                    }
+
+                    if (nCreature.Visuals.Bounds == null)
+                    {
+                        var bounds = nCreature.Visuals.GetNodeOrNull<Control>("%Bounds")
+                                  ?? nCreature.Visuals.GetNodeOrNull<Control>("Bounds")
+                                  ?? new Control { Name = "Bounds", CustomMinimumSize = new Vector2(100, 200) };
+                        if (!bounds.IsInsideTree())
+                        {
+                            nCreature.Visuals.AddChild(bounds);
+                        }
+                        nCreature.Visuals.Bounds = bounds;
+                    }
+
+                    if (nCreature.Visuals.IntentPosition == null)
+                    {
+                        var intentPos = nCreature.Visuals.GetNodeOrNull<Marker2D>("%IntentPos")
+                                     ?? nCreature.Visuals.GetNodeOrNull<Marker2D>("IntentPos")
+                                     ?? new Marker2D { Name = "IntentPos", Position = new Vector2(0, -200) };
+                        if (!intentPos.IsInsideTree())
+                        {
+                            nCreature.Visuals.AddChild(intentPos);
+                        }
+                        nCreature.Visuals.IntentPosition = intentPos;
+                    }
+                }
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NCreatureVisuals nVisuals)
+            {
+                if (nVisuals.VfxSpawnPosition == null)
+                {
+                    var centerPos = nVisuals.GetNodeOrNull<Marker2D>("%CenterPos")
+                                 ?? nVisuals.GetNodeOrNull<Marker2D>("CenterPos")
+                                 ?? new Marker2D { Name = "CenterPos" };
+                    if (!centerPos.IsInsideTree())
+                    {
+                        nVisuals.AddChild(centerPos);
+                    }
+                    nVisuals.VfxSpawnPosition = centerPos;
+                }
+            }
         }
         catch (Exception ex)
         {

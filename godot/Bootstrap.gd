@@ -18,6 +18,21 @@ func callable_init() -> void:
 	DirAccess.make_dir_recursive_absolute("user://MegaCrit/SlayTheSpire2/saves")
 	DirAccess.make_dir_recursive_absolute("user://MegaCrit/SlayTheSpire2/preferences")
 	
+	# Initialize / verify Spine GDExtension
+	if ClassDB.class_exists("SpineSprite"):
+		printerr("[STS2 Bootstrap] SpineSprite is already registered in ClassDB!")
+	else:
+		printerr("[STS2 Bootstrap] SpineSprite NOT registered yet. Checking GDExtension files...")
+		if FileAccess.file_exists("res://addons/spine/spine_godot_extension.gdextension"):
+			var err = GDExtensionManager.load_extension("res://addons/spine/spine_godot_extension.gdextension")
+			printerr("[STS2 Bootstrap] GDExtensionManager.load_extension returned: ", err)
+			if ClassDB.class_exists("SpineSprite"):
+				printerr("[STS2 Bootstrap] SUCCESS: SpineSprite is now registered in ClassDB!")
+			else:
+				printerr("[STS2 Bootstrap] WARNING: SpineSprite still not registered after load_extension.")
+		else:
+			printerr("[STS2 Bootstrap] res://addons/spine/spine_godot_extension.gdextension not found.")
+
 	# 1. Check if assets are already mounted
 	if ResourceLoader.exists("res://scenes/game.tscn"):
 		printerr("[STS2 Bootstrap] Game assets already mounted.")
