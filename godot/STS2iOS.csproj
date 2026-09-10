@@ -9,10 +9,6 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony">
-      <HintPath>../lib/0Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="GodotSharp">
       <HintPath>../lib/GodotSharp.dll</HintPath>
       <Private>false</Private>
@@ -35,14 +31,6 @@
     </Reference>
     <Reference Include="SmartFormat.ZString">
       <HintPath>../lib/SmartFormat.ZString.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="MonoMod.Backports">
-      <HintPath>../lib/MonoMod.Backports.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="MonoMod.ILHelpers">
-      <HintPath>../lib/MonoMod.ILHelpers.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Vortice.DXGI">

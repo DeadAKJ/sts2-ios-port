@@ -26,7 +26,7 @@ public static class AppPaths
         }
         catch (Exception ex)
         {
-            PatchHelper.Log($"EnsureDirectories: {ex.Message}");
+            GD.PrintErr($"EnsureDirectories: {ex.Message}");
         }
     }
 }

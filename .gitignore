@@ -1,6 +1,7 @@
-﻿# Reference and temp folders
+# Reference and temp folders
 ref_sts2_launcher/
 extracted_cfg/
+godot/src_harmony_disabled/
 
 # Build artifacts
 bin/

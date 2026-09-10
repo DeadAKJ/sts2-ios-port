@@ -9,6 +9,13 @@ func _ready() -> void:
 func callable_init() -> void:
 	update_status("Checking game assets...", 0.3)
 	
+	# Pre-create standard save directories in user://
+	DirAccess.make_dir_recursive_absolute("user://Mods")
+	DirAccess.make_dir_recursive_absolute("user://Saves")
+	DirAccess.make_dir_recursive_absolute("user://MegaCrit/SlayTheSpire2")
+	DirAccess.make_dir_recursive_absolute("user://MegaCrit/SlayTheSpire2/saves")
+	DirAccess.make_dir_recursive_absolute("user://MegaCrit/SlayTheSpire2/preferences")
+	
 	# 1. Check if assets are already mounted
 	if ResourceLoader.exists("res://scenes/game.tscn"):
 		launch_game()
@@ -43,8 +50,8 @@ func launch_game() -> void:
 	ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
 	
 	var candidate_scenes = [
-		"res://scenes/screens/main_menu.tscn",
 		"res://scenes/game.tscn",
+		"res://scenes/screens/main_menu.tscn",
 		"res://main.tscn",
 		"res://src/main.tscn"
 	]
