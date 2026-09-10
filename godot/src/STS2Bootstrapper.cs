@@ -39,6 +39,7 @@ public partial class STS2Bootstrapper : Node
         RegisterInputMapActions();
         ConfigureCommandLine();
         ConfigureSteamStubResolver();
+        HookSceneTree();
     }
 
     public void EnsureRegistered()
@@ -49,6 +50,7 @@ public partial class STS2Bootstrapper : Node
         RegisterInputMapActions();
         ConfigureCommandLine();
         ConfigureSteamStubResolver();
+        HookSceneTree();
     }
 
     public static void InitFileLogger()
@@ -281,5 +283,80 @@ public partial class STS2Bootstrapper : Node
         {
             GD.PrintErr($"[STS2Bootstrapper] Exception in ConfigureJsonSerialization: {ex}");
         }
+    }
+
+    private static bool _treeHooked = false;
+
+    public static void HookSceneTree()
+    {
+        if (_treeHooked) return;
+        _treeHooked = true;
+        try
+        {
+            if (Instance != null)
+            {
+                Instance.GetTree().NodeAdded += OnNodeAdded;
+                GD.PrintErr("[STS2Bootstrapper] Hooked SceneTree.NodeAdded successfully!");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Failed to hook SceneTree: {ex}");
+        }
+    }
+
+    private static void OnNodeAdded(Node node)
+    {
+        try
+        {
+            if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NMapScreen mapScreen)
+            {
+                mapScreen.Visible = false;
+                mapScreen.ProcessMode = Node.ProcessModeEnum.Disabled;
+                GD.PrintErr("[STS2Bootstrapper] Initialized NMapScreen: Visible = false, ProcessMode = Disabled");
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NBossMapPoint bossPoint)
+            {
+                var bpType = typeof(MegaCrit.Sts2.Core.Nodes.Screens.Map.NBossMapPoint);
+                var phImage = FindChildRecursive<TextureRect>(bossPoint, "PlaceholderImage");
+                var phOutline = FindChildRecursive<TextureRect>(bossPoint, "PlaceholderOutline");
+                var spriteContainer = FindChildRecursive<Node2D>(bossPoint, "SpriteContainer");
+                var spineSprite = FindChildRecursive<Node2D>(bossPoint, "SpineSprite");
+
+                if (phImage != null)
+                    bpType.GetField("_placeholderImage", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(bossPoint, phImage);
+                if (phOutline != null)
+                    bpType.GetField("_placeholderOutline", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(bossPoint, phOutline);
+                if (spriteContainer != null)
+                    bpType.GetField("_spriteContainer", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(bossPoint, spriteContainer);
+                if (spineSprite != null)
+                    bpType.GetField("_spineSprite", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(bossPoint, spineSprite);
+
+                var actField = bpType.GetField("_act", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (actField != null && actField.GetValue(bossPoint) == null && MegaCrit.Sts2.Core.Runs.RunManager.Instance?.State?.Act != null)
+                {
+                    actField.SetValue(bossPoint, MegaCrit.Sts2.Core.Runs.RunManager.Instance.State.Act);
+                }
+
+                GD.PrintErr("[STS2Bootstrapper] Successfully pre-initialized NBossMapPoint children and fields!");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Exception in OnNodeAdded: {ex}");
+        }
+    }
+
+    private static T? FindChildRecursive<T>(Node parent, string name) where T : Node
+    {
+        var found = parent.GetNodeOrNull<T>("%" + name) ?? parent.GetNodeOrNull<T>(name);
+        if (found != null) return found;
+        foreach (var child in parent.GetChildren())
+        {
+            if ((child.Name == name || child.Name == "%" + name) && child is T tChild) return tChild;
+            var rec = FindChildRecursive<T>(child, name);
+            if (rec != null) return rec;
+        }
+        return null;
     }
 }
