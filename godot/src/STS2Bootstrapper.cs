@@ -15,11 +15,36 @@ public partial class STS2Bootstrapper : Node
     {
         Instance = this;
         RegisterSts2Scripts();
+        ConfigureCommandLine();
     }
 
     public void EnsureRegistered()
     {
         RegisterSts2Scripts();
+        ConfigureCommandLine();
+    }
+
+    public static void ConfigureCommandLine()
+    {
+        try
+        {
+            var cmdType = typeof(MegaCrit.Sts2.Core.Helpers.CommandLineHelper);
+            var argsField = cmdType.GetField("_args", BindingFlags.Static | BindingFlags.NonPublic);
+            if (argsField != null)
+            {
+                var dict = (System.Collections.IDictionary)argsField.GetValue(null)!;
+                dict["force-steam"] = "off";
+                GD.Print("[STS2Bootstrapper] Successfully set force-steam=off in CommandLineHelper!");
+            }
+            else
+            {
+                GD.PrintErr("[STS2Bootstrapper] Could not find _args field in CommandLineHelper");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Exception setting force-steam=off: {ex}");
+        }
     }
 
     public static void RegisterSts2Scripts()
