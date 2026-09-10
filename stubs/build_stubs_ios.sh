@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -17,6 +17,8 @@ clang -arch arm64 \
     -o "$OUT_DIR/libsteam_api.dylib" \
     steam_stub.c steam_stub_auto.c \
     -install_name @rpath/libsteam_api.dylib
+
+cp "$OUT_DIR/libsteam_api.dylib" "$OUT_DIR/libsteam_api64.dylib"
 
 echo "Compiling Sentry stub for iOS arm64..."
 clang -arch arm64 \

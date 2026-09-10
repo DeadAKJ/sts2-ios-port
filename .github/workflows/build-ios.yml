@@ -148,6 +148,8 @@ jobs:
           mkdir -p "$APP_DIR/Frameworks"
           cp stubs/out/ios-arm64/*.dylib "$APP_DIR/Frameworks/" 2>/dev/null || true
           cp stubs/out/ios-arm64/*.dylib "$APP_DIR/" 2>/dev/null || true
+          cp "$APP_DIR/Frameworks/libsteam_api.dylib" "$APP_DIR/Frameworks/libsteam_api64.dylib" 2>/dev/null || true
+          cp "$APP_DIR/libsteam_api.dylib" "$APP_DIR/libsteam_api64.dylib" 2>/dev/null || true
           
           # 5. Copy managed game assemblies
           mkdir -p "$APP_DIR/assemblies"
