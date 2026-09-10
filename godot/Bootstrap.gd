@@ -39,19 +39,28 @@ func callable_init() -> void:
 	show_missing_pck_instructions()
 
 func update_status(message: String, progress: float) -> void:
+	print_error("[STS2 Bootstrap] " + message + " (" + str(int(progress * 100)) + "%)")
+	var log_f = FileAccess.open("user://bootstrap.log", FileAccess.WRITE_READ)
+	if log_f:
+		log_f.seek_end()
+		log_f.store_line("[Bootstrap] " + message)
+		log_f.close()
 	if status_label:
 		status_label.text = message
 	if progress_bar:
 		progress_bar.value = progress * 100.0
 
 func launch_game() -> void:
+	print_error("[STS2 Bootstrap] Entering launch_game()...")
 	update_status("Launching Slay the Spire 2...", 1.0)
 	ProjectSettings.set_setting("input_devices/pointing/emulate_mouse_from_touch", true)
 	ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
 	
 	if has_node("/root/STS2Bootstrapper"):
+		print_error("[STS2 Bootstrap] Calling EnsureRegistered on /root/STS2Bootstrapper")
 		get_node("/root/STS2Bootstrapper").call("EnsureRegistered")
 	elif has_node("STS2Bootstrapper"):
+		print_error("[STS2 Bootstrap] Calling EnsureRegistered on STS2Bootstrapper")
 		get_node("STS2Bootstrapper").call("EnsureRegistered")
 	
 	var candidate_scenes = [
@@ -62,8 +71,10 @@ func launch_game() -> void:
 	]
 	for sc in candidate_scenes:
 		if ResourceLoader.exists(sc):
+			print_error("[STS2 Bootstrap] Transitioning to scene: " + sc)
 			get_tree().change_scene_to_file(sc)
 			return
+	print_error("[STS2 Bootstrap] ERROR: No candidate game scene found in mounted PCK!")
 	show_missing_pck_instructions()
 
 func show_missing_pck_instructions() -> void:

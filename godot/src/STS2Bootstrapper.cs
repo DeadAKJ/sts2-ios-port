@@ -11,9 +11,13 @@ public partial class STS2Bootstrapper : Node
     public static STS2Bootstrapper? Instance { get; private set; }
     public static bool IsRegistered { get; private set; }
 
+    public static string LogFilePath { get; private set; } = "";
+    private static bool _loggerInitialized = false;
+
     public override void _EnterTree()
     {
         Instance = this;
+        InitFileLogger();
         RegisterSts2Scripts();
         RegisterInputMapActions();
         ConfigureSteamStubResolver();
@@ -22,10 +26,52 @@ public partial class STS2Bootstrapper : Node
 
     public void EnsureRegistered()
     {
+        InitFileLogger();
         RegisterSts2Scripts();
         RegisterInputMapActions();
         ConfigureSteamStubResolver();
         ConfigureCommandLine();
+    }
+
+    public static void InitFileLogger()
+    {
+        if (_loggerInitialized) return;
+        _loggerInitialized = true;
+        try
+        {
+            string userDir = OS.GetUserDataDir();
+            LogFilePath = System.IO.Path.Combine(userDir, "sts2_game.log");
+            System.IO.File.AppendAllText(LogFilePath, $"\n=== STS2 Session Started at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC ===\n");
+            GD.PrintErr($"[STS2Bootstrapper] Logging initialized! Log path: {LogFilePath}");
+
+            // Hook MegaCrit C# Log events
+            MegaCrit.Sts2.Core.Logging.Log.LogCallback += (level, text, skipFrames) =>
+            {
+                string line = $"[{DateTime.UtcNow:HH:mm:ss.fff}] [{level}] {text}";
+                GD.PrintErr(line);
+                try { System.IO.File.AppendAllText(LogFilePath, line + "\n"); } catch { }
+            };
+
+            // Hook Unhandled Exceptions
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                string line = $"[{DateTime.UtcNow:HH:mm:ss.fff}] [FATAL EXCEPTION] {e.ExceptionObject}";
+                GD.PrintErr(line);
+                try { System.IO.File.AppendAllText(LogFilePath, line + "\n"); } catch { }
+            };
+
+            // Hook Unobserved Task Exceptions
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                string line = $"[{DateTime.UtcNow:HH:mm:ss.fff}] [TASK EXCEPTION] {e.Exception}";
+                GD.PrintErr(line);
+                try { System.IO.File.AppendAllText(LogFilePath, line + "\n"); } catch { }
+            };
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Failed to initialize file logger: {ex}");
+        }
     }
 
     public override void _Process(double delta)
