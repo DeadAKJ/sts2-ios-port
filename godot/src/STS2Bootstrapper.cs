@@ -15,6 +15,7 @@ public partial class STS2Bootstrapper : Node
     {
         Instance = this;
         RegisterSts2Scripts();
+        RegisterInputMapActions();
         ConfigureSteamStubResolver();
         ConfigureCommandLine();
     }
@@ -22,8 +23,55 @@ public partial class STS2Bootstrapper : Node
     public void EnsureRegistered()
     {
         RegisterSts2Scripts();
+        RegisterInputMapActions();
         ConfigureSteamStubResolver();
         ConfigureCommandLine();
+    }
+
+    public override void _Process(double delta)
+    {
+        // On iOS without an external gamepad, force mouse/touch mode if NControllerManager accidentally engages controller mode
+        try
+        {
+            var ctrlMgr = MegaCrit.Sts2.Core.Nodes.CommonUi.NControllerManager.Instance;
+            if (ctrlMgr != null && ctrlMgr.IsUsingController && Input.GetConnectedJoypads().Count == 0)
+            {
+                var field = typeof(MegaCrit.Sts2.Core.Nodes.CommonUi.NControllerManager)
+                    .GetField("<IsUsingController>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (field != null)
+                {
+                    field.SetValue(ctrlMgr, false);
+                    ctrlMgr.EmitSignal(MegaCrit.Sts2.Core.Nodes.CommonUi.NControllerManager.SignalName.MouseDetected);
+                    var method = typeof(MegaCrit.Sts2.Core.Nodes.CommonUi.NControllerManager)
+                        .GetMethod("ControlModeChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+                    method?.Invoke(ctrlMgr, null);
+                    GD.Print("[STS2Bootstrapper] Reset NControllerManager to Touch/Mouse mode.");
+                }
+            }
+        }
+        catch { }
+    }
+
+    public static void RegisterInputMapActions()
+    {
+        try
+        {
+            var actions = MegaCrit.Sts2.Core.ControllerInput.Controller.AllControllerInputs;
+            int added = 0;
+            foreach (var action in actions)
+            {
+                if (!InputMap.HasAction(action))
+                {
+                    InputMap.AddAction(action);
+                    added++;
+                }
+            }
+            GD.Print($"[STS2Bootstrapper] Registered {added} missing controller actions in InputMap. Total now: {actions.Length}");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Failed to register InputMap actions: {ex}");
+        }
     }
 
     public static void ConfigureSteamStubResolver()
