@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Godot.NET.Sdk/4.5.2">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -7,12 +7,14 @@
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
     <UseSharedCompilation>false</UseSharedCompilation>
     <ServerGarbageCollection>false</ServerGarbageCollection>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="GodotSharp">
-      <HintPath>../lib/GodotSharp.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <TrimmerRootAssembly Include="sts2" />
+    <TrimmerRootAssembly Include="GodotSharp" />
+    <TrimmerRootAssembly Include="$(TargetName)" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="sts2">
       <HintPath>../lib/sts2.dll</HintPath>
       <Private>false</Private>

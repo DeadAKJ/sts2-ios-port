@@ -26,10 +26,6 @@ jobs:
           chmod +x stubs/build_stubs_ios.sh
           ./stubs/build_stubs_ios.sh
 
-      - name: Build STS2iOS Assembly
-        run: |
-          dotnet build godot/STS2iOS.csproj -c Release
-
       - name: Download Godot 4.5.2 Mono & iOS Export Templates
         run: |
           mkdir -p ~/godot_bin
@@ -51,6 +47,9 @@ jobs:
           sudo mv /tmp/godot /usr/local/bin/godot
           /usr/local/bin/godot --version
           
+          # Register local Godot .NET SDK NuGet package source
+          dotnet nuget add source /Applications/Godot.app/Contents/Resources/GodotSharp/Tools/nupkgs/ --name GodotLocal || true
+          
           TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates/4.5.2.stable.mono"
           mkdir -p "$TEMPLATES_DIR"
           echo "Downloading Godot 4.5.2 Mono export templates..."
@@ -60,6 +59,10 @@ jobs:
           echo "Export templates installed to $TEMPLATES_DIR:"
           ls -la "$TEMPLATES_DIR"
 
+      - name: Build STS2iOS Assembly
+        run: |
+          dotnet build godot/STS2iOS.csproj -c Release
+
       - name: Export iOS Xcode Project
         env:
           DOTNET_CLI_DO_NOT_USE_GLOBAL_BUILD_SERVERS: 1
@@ -68,8 +71,13 @@ jobs:
           mkdir -p build/ios godot/build/ios
           ROOT_DIR="$(pwd)"
           cd godot
-          /Applications/Godot.app/Contents/MacOS/Godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj"
+          /Applications/Godot.app/Contents/MacOS/Godot --headless --verbose --export-release "iOS" "$ROOT_DIR/build/ios/SlayTheSpire2.xcodeproj" || true
           cd ..
+          
+          # Print any msbuild export failure logs
+          echo "Checking MSBuild export logs..."
+          find "$HOME/Library/Application Support/Godot/mono/build_logs" -name "msbuild_log.txt" -exec cat {} + 2>/dev/null || true
+          
           if [ -d "godot/build/ios/SlayTheSpire2.xcodeproj" ]; then
             cp -R godot/build/ios/* build/ios/
           fi
