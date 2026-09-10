@@ -66,12 +66,10 @@ jobs:
           echo "Downloading Spine GDExtension from $SPINE_URL..."
           curl -L -f -o /tmp/spine_ext/spine.zip "$SPINE_URL"
           unzip -q /tmp/spine_ext/spine.zip -d /tmp/spine_ext
-          mkdir -p godot/addons/spine/ios
-          cp /tmp/spine_ext/bin/spine_godot_extension.gdextension godot/addons/spine/
-          cp -R /tmp/spine_ext/bin/ios/* godot/addons/spine/ios/
+          mkdir -p godot/addons/spine
+          cp -R /tmp/spine_ext/bin/* godot/addons/spine/
           echo "Installed Spine GDExtension to godot/addons/spine:"
           ls -la godot/addons/spine
-          ls -la godot/addons/spine/ios
 
       - name: Build STS2iOS Assembly
         run: |
