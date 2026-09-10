@@ -17,20 +17,20 @@ public partial class STS2Bootstrapper : Node
     public override void _EnterTree()
     {
         Instance = this;
+        InitFileLogger();
         RegisterSts2Scripts();
         RegisterInputMapActions();
-        InitFileLogger();
-        ConfigureSteamStubResolver();
         ConfigureCommandLine();
+        ConfigureSteamStubResolver();
     }
 
     public void EnsureRegistered()
     {
+        InitFileLogger();
         RegisterSts2Scripts();
         RegisterInputMapActions();
-        InitFileLogger();
-        ConfigureSteamStubResolver();
         ConfigureCommandLine();
+        ConfigureSteamStubResolver();
     }
 
     public static void InitFileLogger()
@@ -113,7 +113,7 @@ public partial class STS2Bootstrapper : Node
                     added++;
                 }
             }
-            GD.Print($"[STS2Bootstrapper] Registered {added} missing controller actions in InputMap. Total now: {actions.Length}");
+            GD.PrintErr($"[STS2Bootstrapper] Registered {added} missing controller actions in InputMap. Total now: {actions.Length}");
         }
         catch (Exception ex)
         {
@@ -121,14 +121,17 @@ public partial class STS2Bootstrapper : Node
         }
     }
 
+    private static bool _steamResolverConfigured = false;
+
     public static void ConfigureSteamStubResolver()
     {
+        if (_steamResolverConfigured) return;
         try
         {
             var steamAssembly = typeof(Steamworks.SteamAPI).Assembly;
             System.Runtime.InteropServices.NativeLibrary.SetDllImportResolver(steamAssembly, (libraryName, assembly, searchPath) =>
             {
-                GD.Print($"[STS2Bootstrapper] Resolving DllImport for library: '{libraryName}'");
+                GD.PrintErr($"[STS2Bootstrapper] Resolving DllImport for library: '{libraryName}'");
                 if (libraryName == "steam_api" || libraryName == "steam_api64" || libraryName.Contains("steam_api"))
                 {
                     if (System.Runtime.InteropServices.NativeLibrary.TryLoad("libsteam_api64.dylib", assembly, searchPath, out nint handle))
@@ -142,7 +145,8 @@ public partial class STS2Bootstrapper : Node
                 }
                 return nint.Zero;
             });
-            GD.Print("[STS2Bootstrapper] Steam DllImportResolver registered successfully.");
+            _steamResolverConfigured = true;
+            GD.PrintErr("[STS2Bootstrapper] Steam DllImportResolver registered successfully.");
         }
         catch (Exception ex)
         {
@@ -169,7 +173,7 @@ public partial class STS2Bootstrapper : Node
                     genericDict["--force-steam"] = "off";
                     genericDict["skip-steam"] = "true";
                     genericDict["--skip-steam"] = "true";
-                    GD.Print($"[STS2Bootstrapper] Set force-steam=off in IDictionary<string, string?>! HasArg('force-steam')={MegaCrit.Sts2.Core.Helpers.CommandLineHelper.HasArg("force-steam")}, GetValue('force-steam')='{MegaCrit.Sts2.Core.Helpers.CommandLineHelper.GetValue("force-steam")}'");
+                    GD.PrintErr($"[STS2Bootstrapper] Set force-steam=off in IDictionary<string, string?>! HasArg('force-steam')={MegaCrit.Sts2.Core.Helpers.CommandLineHelper.HasArg("force-steam")}, GetValue('force-steam')='{MegaCrit.Sts2.Core.Helpers.CommandLineHelper.GetValue("force-steam")}'");
                 }
                 else if (dictObj is Godot.Collections.Dictionary<string, string?> godotDict)
                 {
@@ -177,7 +181,7 @@ public partial class STS2Bootstrapper : Node
                     godotDict["--force-steam"] = "off";
                     godotDict["skip-steam"] = "true";
                     godotDict["--skip-steam"] = "true";
-                    GD.Print($"[STS2Bootstrapper] Set force-steam=off in Godot Dictionary! HasArg('force-steam')={MegaCrit.Sts2.Core.Helpers.CommandLineHelper.HasArg("force-steam")}, GetValue('force-steam')='{MegaCrit.Sts2.Core.Helpers.CommandLineHelper.GetValue("force-steam")}'");
+                    GD.PrintErr($"[STS2Bootstrapper] Set force-steam=off in Godot Dictionary! HasArg('force-steam')={MegaCrit.Sts2.Core.Helpers.CommandLineHelper.HasArg("force-steam")}, GetValue('force-steam')='{MegaCrit.Sts2.Core.Helpers.CommandLineHelper.GetValue("force-steam")}'");
                 }
                 else if (dictObj is System.Collections.IDictionary nonGenericDict)
                 {
@@ -185,7 +189,7 @@ public partial class STS2Bootstrapper : Node
                     nonGenericDict["--force-steam"] = "off";
                     nonGenericDict["skip-steam"] = "true";
                     nonGenericDict["--skip-steam"] = "true";
-                    GD.Print($"[STS2Bootstrapper] Set force-steam=off in non-generic IDictionary! HasArg('force-steam')={MegaCrit.Sts2.Core.Helpers.CommandLineHelper.HasArg("force-steam")}, GetValue('force-steam')='{MegaCrit.Sts2.Core.Helpers.CommandLineHelper.GetValue("force-steam")}'");
+                    GD.PrintErr($"[STS2Bootstrapper] Set force-steam=off in non-generic IDictionary! HasArg('force-steam')={MegaCrit.Sts2.Core.Helpers.CommandLineHelper.HasArg("force-steam")}, GetValue('force-steam')='{MegaCrit.Sts2.Core.Helpers.CommandLineHelper.GetValue("force-steam")}'");
                 }
                 else
                 {
@@ -206,14 +210,14 @@ public partial class STS2Bootstrapper : Node
     public static void RegisterSts2Scripts()
     {
         if (IsRegistered) return;
-        GD.Print("[STS2Bootstrapper] Registering sts2 assembly scripts with Godot...");
+        GD.PrintErr("[STS2Bootstrapper] Registering sts2 assembly scripts with Godot...");
         try
         {
             var sts2Assembly = typeof(MegaCrit.Sts2.Core.Nodes.NGame).Assembly;
-            GD.Print($"[STS2Bootstrapper] Located sts2 assembly: {sts2Assembly.FullName}");
+            GD.PrintErr($"[STS2Bootstrapper] Located sts2 assembly: {sts2Assembly.FullName}");
             ScriptManagerBridge.LookupScriptsInAssembly(sts2Assembly);
             IsRegistered = true;
-            GD.Print("[STS2Bootstrapper] Successfully registered all sts2 scripts with Godot!");
+            GD.PrintErr("[STS2Bootstrapper] Successfully registered all sts2 scripts with Godot!");
         }
         catch (Exception ex)
         {
