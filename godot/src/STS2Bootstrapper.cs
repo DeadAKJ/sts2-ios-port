@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -333,9 +334,14 @@ public partial class STS2Bootstrapper : Node
                     bpType.GetField("_spineSprite", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(bossPoint, spineSprite);
 
                 var actField = bpType.GetField("_act", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (actField != null && actField.GetValue(bossPoint) == null && MegaCrit.Sts2.Core.Runs.RunManager.Instance?.State?.Act != null)
+                if (actField != null && actField.GetValue(bossPoint) == null)
                 {
-                    actField.SetValue(bossPoint, MegaCrit.Sts2.Core.Runs.RunManager.Instance.State.Act);
+                    var rsField = bpType.GetField("_runState", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var rs = rsField?.GetValue(bossPoint) as MegaCrit.Sts2.Core.Runs.IRunState;
+                    if (rs?.Act != null)
+                    {
+                        actField.SetValue(bossPoint, rs.Act);
+                    }
                 }
 
                 GD.PrintErr("[STS2Bootstrapper] Successfully pre-initialized NBossMapPoint children and fields!");
