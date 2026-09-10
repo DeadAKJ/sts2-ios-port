@@ -7,7 +7,9 @@ func _ready() -> void:
 	callable_init.call_deferred()
 
 func callable_init() -> void:
+	await get_tree().process_frame
 	update_status("Checking game assets...", 0.3)
+	await get_tree().process_frame
 	
 	# Pre-create standard save directories in user://
 	DirAccess.make_dir_recursive_absolute("user://Mods")
@@ -24,6 +26,7 @@ func callable_init() -> void:
 	# 2. Check user documents folder (Documents/SlayTheSpire2.pck)
 	if FileAccess.file_exists("user://SlayTheSpire2.pck"):
 		update_status("Loading SlayTheSpire2.pck from Documents...", 0.6)
+		await get_tree().process_frame
 		if ProjectSettings.load_resource_pack("user://SlayTheSpire2.pck"):
 			launch_game()
 			return
@@ -31,6 +34,7 @@ func callable_init() -> void:
 	# 3. Check bundled pck
 	if FileAccess.file_exists("res://SlayTheSpire2.pck"):
 		update_status("Loading bundled SlayTheSpire2.pck...", 0.6)
+		await get_tree().process_frame
 		if ProjectSettings.load_resource_pack("res://SlayTheSpire2.pck"):
 			launch_game()
 			return
@@ -40,11 +44,6 @@ func callable_init() -> void:
 
 func update_status(message: String, progress: float) -> void:
 	print_error("[STS2 Bootstrap] " + message + " (" + str(int(progress * 100)) + "%)")
-	var log_f = FileAccess.open("user://bootstrap.log", FileAccess.WRITE_READ)
-	if log_f:
-		log_f.seek_end()
-		log_f.store_line("[Bootstrap] " + message)
-		log_f.close()
 	if status_label:
 		status_label.text = message
 	if progress_bar:
@@ -53,6 +52,7 @@ func update_status(message: String, progress: float) -> void:
 func launch_game() -> void:
 	print_error("[STS2 Bootstrap] Entering launch_game()...")
 	update_status("Launching Slay the Spire 2...", 1.0)
+	await get_tree().process_frame
 	ProjectSettings.set_setting("input_devices/pointing/emulate_mouse_from_touch", true)
 	ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
 	

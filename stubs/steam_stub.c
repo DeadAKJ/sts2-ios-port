@@ -1,20 +1,7 @@
-// Stub Steamworks SDK for Android. Satisfies Steamworks.NET P/Invoke symbols
-// with no-op implementations that return safe defaults.
-
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h>
-#include <unistd.h>
 
 static int dummy_steam_object = 0;
-
-__attribute__((constructor))
-static void init_redirect_stdout_to_stderr(void) {
-    setvbuf(stdout, NULL, _IONBF, 0);
-    setvbuf(stderr, NULL, _IONBF, 0);
-    dup2(STDERR_FILENO, STDOUT_FILENO);
-    fprintf(stderr, "[STS2 Native] stdout redirected to stderr for syslog capture.\n");
-}
 
 int SteamAPI_RestartAppIfNecessary(uint32_t unOwnAppID) {
     return 0;

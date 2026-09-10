@@ -17,18 +17,18 @@ public partial class STS2Bootstrapper : Node
     public override void _EnterTree()
     {
         Instance = this;
-        InitFileLogger();
         RegisterSts2Scripts();
         RegisterInputMapActions();
+        InitFileLogger();
         ConfigureSteamStubResolver();
         ConfigureCommandLine();
     }
 
     public void EnsureRegistered()
     {
-        InitFileLogger();
         RegisterSts2Scripts();
         RegisterInputMapActions();
+        InitFileLogger();
         ConfigureSteamStubResolver();
         ConfigureCommandLine();
     }
@@ -40,6 +40,7 @@ public partial class STS2Bootstrapper : Node
         try
         {
             string userDir = OS.GetUserDataDir();
+            System.IO.Directory.CreateDirectory(userDir);
             LogFilePath = System.IO.Path.Combine(userDir, "sts2_game.log");
             System.IO.File.AppendAllText(LogFilePath, $"\n=== STS2 Session Started at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC ===\n");
             GD.PrintErr($"[STS2Bootstrapper] Logging initialized! Log path: {LogFilePath}");

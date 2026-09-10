@@ -39,32 +39,3 @@ project/assembly_name="STS2iOS"
 
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
-
-[debug]
-
-file_logging/enable_file_logging=true
-file_logging/log_path="user://godot.log"
-file_logging/max_log_files=5
-
-[input]
-
-controller_left_trigger={"deadzone": 0.5, "events": []}
-controller_right_trigger={"deadzone": 0.5, "events": []}
-controller_left_bumper={"deadzone": 0.5, "events": []}
-controller_right_bumper={"deadzone": 0.5, "events": []}
-controller_d_pad_north={"deadzone": 0.5, "events": []}
-controller_d_pad_south={"deadzone": 0.5, "events": []}
-controller_d_pad_east={"deadzone": 0.5, "events": []}
-controller_d_pad_west={"deadzone": 0.5, "events": []}
-controller_face_button_north={"deadzone": 0.5, "events": []}
-controller_face_button_south={"deadzone": 0.5, "events": []}
-controller_face_button_east={"deadzone": 0.5, "events": []}
-controller_face_button_west={"deadzone": 0.5, "events": []}
-controller_start_button={"deadzone": 0.5, "events": []}
-controller_select_button={"deadzone": 0.5, "events": []}
-controller_joystick_press={"deadzone": 0.5, "events": []}
-controller_joystick_left={"deadzone": 0.5, "events": []}
-controller_joystick_right={"deadzone": 0.5, "events": []}
-controller_joystick_up={"deadzone": 0.5, "events": []}
-controller_joystick_down={"deadzone": 0.5, "events": []}
-ui_controller_touch_pad={"deadzone": 0.5, "events": []}
