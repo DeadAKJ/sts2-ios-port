@@ -9,7 +9,12 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault" Value="true" />
+  </ItemGroup>
 
   <ItemGroup>
     <TrimmerRootAssembly Include="sts2" />

@@ -1,9 +1,25 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Godot;
 using Godot.Bridge;
 
 namespace STS2Mobile;
+
+[JsonSerializable(typeof(MegaCrit.Sts2.Core.Assets.TpSheetData))]
+[JsonSerializable(typeof(MegaCrit.Sts2.Core.Assets.TpSheetTexture))]
+[JsonSerializable(typeof(MegaCrit.Sts2.Core.Assets.TpSheetSprite))]
+[JsonSerializable(typeof(MegaCrit.Sts2.Core.Assets.TpSheetRect))]
+[JsonSerializable(typeof(MegaCrit.Sts2.Core.Assets.TpSheetSize))]
+[JsonSerializable(typeof(List<MegaCrit.Sts2.Core.Assets.TpSheetTexture>))]
+[JsonSerializable(typeof(List<MegaCrit.Sts2.Core.Assets.TpSheetSprite>))]
+[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
+internal partial class TpSheetJsonContext : JsonSerializerContext
+{
+}
 
 [ScriptPath("res://src/STS2Bootstrapper.cs")]
 public partial class STS2Bootstrapper : Node
@@ -18,6 +34,7 @@ public partial class STS2Bootstrapper : Node
     {
         Instance = this;
         InitFileLogger();
+        ConfigureJsonSerialization();
         RegisterSts2Scripts();
         RegisterInputMapActions();
         ConfigureCommandLine();
@@ -27,6 +44,7 @@ public partial class STS2Bootstrapper : Node
     public void EnsureRegistered()
     {
         InitFileLogger();
+        ConfigureJsonSerialization();
         RegisterSts2Scripts();
         RegisterInputMapActions();
         ConfigureCommandLine();
@@ -222,6 +240,46 @@ public partial class STS2Bootstrapper : Node
         catch (Exception ex)
         {
             GD.PrintErr($"[STS2Bootstrapper] Failed to register sts2 scripts: {ex}");
+        }
+    }
+
+    public static void ConfigureJsonSerialization()
+    {
+        try
+        {
+            AppContext.SetSwitch("System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault", true);
+            GD.PrintErr("[STS2Bootstrapper] AppContext switch JsonSerializer.IsReflectionEnabledByDefault set to true.");
+
+            var atlasType = typeof(MegaCrit.Sts2.Core.Assets.AtlasManager);
+            var field = atlasType.GetField("_jsonOptions", BindingFlags.Static | BindingFlags.NonPublic);
+            if (field != null)
+            {
+                var combinedResolver = JsonTypeInfoResolver.Combine(TpSheetJsonContext.Default, new DefaultJsonTypeInfoResolver());
+                var opts = field.GetValue(null) as JsonSerializerOptions;
+                if (opts != null && !opts.IsReadOnly)
+                {
+                    opts.TypeInfoResolver = combinedResolver;
+                    GD.PrintErr("[STS2Bootstrapper] Attached source-generated & default resolver to existing AtlasManager._jsonOptions!");
+                }
+                else
+                {
+                    var newOpts = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        TypeInfoResolver = combinedResolver
+                    };
+                    field.SetValue(null, newOpts);
+                    GD.PrintErr("[STS2Bootstrapper] Replaced AtlasManager._jsonOptions with new instance using combined resolver!");
+                }
+            }
+            else
+            {
+                GD.PrintErr("[STS2Bootstrapper] Could not find field _jsonOptions in AtlasManager!");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Exception in ConfigureJsonSerialization: {ex}");
         }
     }
 }
