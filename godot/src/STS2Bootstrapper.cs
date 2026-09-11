@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using System.Runtime.InteropServices;
 using Godot;
 using Godot.Bridge;
 
@@ -27,6 +28,16 @@ public partial class STS2Bootstrapper : Node
 {
     public static STS2Bootstrapper? Instance { get; private set; }
     public static bool IsRegistered { get; private set; }
+
+    [UnmanagedCallersOnly(EntryPoint = "load_all_fmod_plugins")]
+    public static unsafe uint* LoadAllFmodPlugins(void* pInterface, uint* rCount)
+    {
+        if (rCount != null)
+        {
+            *rCount = 0;
+        }
+        return null;
+    }
 
     public static string LogFilePath { get; private set; } = "";
     private static bool _loggerInitialized = false;

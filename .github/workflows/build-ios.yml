@@ -83,6 +83,10 @@ jobs:
           if [ -d "godot/addons/fmod/libs/iOS" ] && [ ! -d "godot/addons/fmod/libs/ios" ]; then
             cp -R godot/addons/fmod/libs/iOS godot/addons/fmod/libs/ios
           fi
+
+          # Patch libGodotFmod on iOS to bypass undefined load_all_fmod_plugins call
+          python3 scripts/patch_fmod_ios.py
+
           echo "Installed FMOD GDExtension to godot/addons/fmod:"
           ls -la godot/addons/fmod
           ls -la godot/addons/fmod/libs/ios
@@ -118,15 +122,6 @@ jobs:
           cd build/ios
           XCODEPROJ=$(find . -name "*.xcodeproj" -maxdepth 2 | head -n 1)
           echo "Found Xcode project: $XCODEPROJ"
-
-          # Inject load_all_fmod_plugins definition into Xcode project source files
-          echo "Injecting load_all_fmod_plugins definition into Xcode project..."
-          find . -type f \( -name "*.mm" -o -name "*.m" -o -name "*.cpp" \) | while read -r src; do
-            if grep -q "UIApplicationMain" "$src" 2>/dev/null || grep -q "main(" "$src" 2>/dev/null; then
-              echo "Injecting load_all_fmod_plugins into $src..."
-              printf '\n#ifdef __cplusplus\nextern "C" {\n#endif\n__attribute__((visibility("default"))) __attribute__((used))\nuint32_t* load_all_fmod_plugins(void* p_interface, uint32_t* r_count) {\n    if (r_count) { *r_count = 0; }\n    return 0;\n}\n#ifdef __cplusplus\n}\n#endif\n' >> "$src"
-            fi
-          done
           
           if [ -n "$XCODEPROJ" ]; then
             SCHEME=$(xcodebuild -list -project "$XCODEPROJ" | awk '/Schemes:/{flag=1;next}/^[[:space:]]*$/{flag=0}flag' | head -n 1 | tr -d ' ')
