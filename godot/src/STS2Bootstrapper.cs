@@ -30,13 +30,13 @@ public partial class STS2Bootstrapper : Node
     public static bool IsRegistered { get; private set; }
 
     [UnmanagedCallersOnly(EntryPoint = "load_all_fmod_plugins")]
-    public static unsafe uint* LoadAllFmodPlugins(void* pInterface, uint* rCount)
+    public static IntPtr LoadAllFmodPlugins(IntPtr pInterface, IntPtr rCount)
     {
-        if (rCount != null)
+        if (rCount != IntPtr.Zero)
         {
-            *rCount = 0;
+            Marshal.WriteInt32(rCount, 0);
         }
-        return null;
+        return IntPtr.Zero;
     }
 
     public static string LogFilePath { get; private set; } = "";

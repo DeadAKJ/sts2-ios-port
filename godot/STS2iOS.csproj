@@ -8,6 +8,7 @@
     <UseSharedCompilation>false</UseSharedCompilation>
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
