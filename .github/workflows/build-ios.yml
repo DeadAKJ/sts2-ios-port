@@ -176,6 +176,13 @@ jobs:
           echo "Installing Info.plist..."
           cp godot/Info.plist "$APP_DIR/Info.plist"
           
+          # 3b. Ensure Launch Screen storyboards exist in all naming variants
+          if [ -d "$APP_DIR/Launch Screen.storyboardc" ] && [ ! -d "$APP_DIR/LaunchScreen.storyboardc" ]; then
+            cp -R "$APP_DIR/Launch Screen.storyboardc" "$APP_DIR/LaunchScreen.storyboardc"
+          elif [ -d "$APP_DIR/LaunchScreen.storyboardc" ] && [ ! -d "$APP_DIR/Launch Screen.storyboardc" ]; then
+            cp -R "$APP_DIR/LaunchScreen.storyboardc" "$APP_DIR/Launch Screen.storyboardc"
+          fi
+          
           # 4. Copy iOS native stubs
           mkdir -p "$APP_DIR/Frameworks"
           cp stubs/out/ios-arm64/*.dylib "$APP_DIR/Frameworks/" 2>/dev/null || true

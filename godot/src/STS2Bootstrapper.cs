@@ -209,6 +209,7 @@ public partial class STS2Bootstrapper : Node
                 {
                     window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
                 }
+                DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
             }
 
             // Hide mouse cursor on mobile touch screen to avoid NCursorManager per-touch bitmap updates
