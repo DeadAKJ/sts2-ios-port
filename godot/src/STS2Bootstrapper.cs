@@ -103,10 +103,13 @@ public partial class STS2Bootstrapper : Node
                 // Clean exit on main menu quit
                 if (text != null && text.Contains("NGame.Quit called"))
                 {
-                    GD.PrintErr("[STS2Bootstrapper] Detected NGame.Quit called! Terminating process in 500ms after saves flush...");
-                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+                    GD.PrintErr("[STS2Bootstrapper] Detected NGame.Quit called! Requesting clean SceneTree quit in 300ms...");
+                    System.Threading.Tasks.Task.Delay(300).ContinueWith(_ =>
                     {
-                        try { System.Environment.Exit(0); } catch { }
+                        Callable.From(() =>
+                        {
+                            try { Instance?.GetTree()?.Quit(0); } catch { }
+                        }).CallDeferred();
                     });
                 }
             };
@@ -140,11 +143,15 @@ public partial class STS2Bootstrapper : Node
         // 2009 is NotificationOsMemoryWarning in Godot
         if (what == 2009)
         {
-            GD.PrintErr("[STS2Bootstrapper] OS Low Memory Warning received! Collecting GC heap...");
+            GD.PrintErr("[STS2Bootstrapper] OS Low Memory Warning received! Dropping caches and collecting GC heap...");
             try
             {
+                _preloadedCharacters.Clear();
+                _permanentAssetCache.Clear();
+                _monsterIntentsPrewarmed = false;
                 GC.Collect(2, GCCollectionMode.Aggressive, true, true);
                 GC.WaitForPendingFinalizers();
+                GC.Collect(2, GCCollectionMode.Aggressive, true, true);
             }
             catch { }
         }
@@ -446,31 +453,6 @@ public partial class STS2Bootstrapper : Node
             {
                 missedSet.Clear();
             }
-
-            var cacheField = cacheType.GetField("_cache", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (cacheField?.GetValue(cache) is System.Collections.IDictionary dict)
-            {
-                // Mirror all loaded assets into permanent cache so they never get garbage collected
-                foreach (System.Collections.DictionaryEntry entry in dict)
-                {
-                    if (entry.Key is string key && entry.Value is Resource res && GodotObject.IsInstanceValid(res))
-                    {
-                        if (!_permanentAssetCache.ContainsKey(key))
-                        {
-                            _permanentAssetCache[key] = res;
-                        }
-                    }
-                }
-
-                // If any asset was removed by MegaCrit, restore it immediately
-                foreach (var kvp in _permanentAssetCache)
-                {
-                    if (!dict.Contains(kvp.Key) && GodotObject.IsInstanceValid(kvp.Value))
-                    {
-                        dict[kvp.Key] = kvp.Value;
-                    }
-                }
-            }
         }
         catch { }
     }
@@ -498,44 +480,43 @@ public partial class STS2Bootstrapper : Node
                 catch { }
             }
 
-            // Defend (00 - 45)
-            for (int i = 0; i <= 45; i++)
+            // Defend (00 - 44)
+            for (int i = 0; i <= 44; i++)
                 TryLoad($"res://images/atlases/intent_atlas.sprites/defend/intent_defend_{i:D2}.tres");
+            TryLoad("res://images/atlases/intent_atlas.sprites/intent_defend.tres");
 
-            // Buff (00 - 30)
-            for (int i = 0; i <= 30; i++)
+            // Buff (00 - 29)
+            for (int i = 0; i <= 29; i++)
                 TryLoad($"res://images/atlases/intent_atlas.sprites/buff/intent_buff_{i:D2}.tres");
+            TryLoad("res://images/atlases/intent_atlas.sprites/intent_buff.tres");
 
-            // Debuff (00 - 30)
-            for (int i = 0; i <= 30; i++)
-                TryLoad($"res://images/atlases/intent_atlas.sprites/debuff/intent_debuff_{i:D2}.tres");
-
-            // MegaDebuff (00 - 15)
-            for (int i = 0; i <= 15; i++)
+            // MegaDebuff (00 - 10)
+            for (int i = 0; i <= 10; i++)
                 TryLoad($"res://images/atlases/intent_atlas.sprites/debuff/intent_megadebuff_{i:D2}.tres");
+            TryLoad("res://images/atlases/intent_atlas.sprites/intent_debuff.tres");
 
-            // Status (00 - 20)
-            for (int i = 0; i <= 20; i++)
-                TryLoad($"res://images/atlases/intent_statuscard.sprites/status/intent_statuscard_{i:D2}.tres");
-            for (int i = 0; i <= 20; i++)
+            // Card Debuff (00 - 14)
+            for (int i = 0; i <= 14; i++)
+                TryLoad($"res://images/atlases/intent_atlas.sprites/card_debuff/intent_carddebuff_{i:D2}.tres");
+            TryLoad("res://images/atlases/intent_atlas.sprites/intent_card_debuff.tres");
+
+            // Status Card (00 - 18)
+            for (int i = 0; i <= 18; i++)
                 TryLoad($"res://images/atlases/intent_atlas.sprites/status/intent_statuscard_{i:D2}.tres");
+            TryLoad("res://images/atlases/intent_atlas.sprites/intent_status_card.tres");
 
-            // Attacks (1 - 10)
-            for (int i = 1; i <= 10; i++)
+            // Attacks (1 - 5)
+            for (int i = 1; i <= 5; i++)
             {
                 TryLoad($"res://images/atlases/intent_atlas.sprites/attack/intent_attack_{i}.png");
+                TryLoad($"res://images/atlases/intent_atlas.sprites/attack/intent_attack_{i}.tres");
                 TryLoad($"res://images/atlases/intent_atlas.sprites/attack/intent_attack_{i:D2}.tres");
             }
 
-            // Special statuses
-            for (int i = 0; i <= 20; i++)
-            {
+            // Sleep (00 - 15)
+            for (int i = 0; i <= 15; i++)
                 TryLoad($"res://images/atlases/intent_atlas.sprites/sleep/intent_sleep_{i:D2}.tres");
-                TryLoad($"res://images/atlases/intent_atlas.sprites/stun/intent_stun_{i:D2}.tres");
-                TryLoad($"res://images/atlases/intent_atlas.sprites/curse/intent_curse_{i:D2}.tres");
-                TryLoad($"res://images/atlases/intent_atlas.sprites/death/intent_death_{i:D2}.tres");
-                TryLoad($"res://images/atlases/intent_atlas.sprites/escape/intent_escape_{i:D2}.tres");
-            }
+            TryLoad("res://images/atlases/intent_atlas.sprites/intent_sleep.tres");
 
             ClearMissedCacheAssets();
             GD.PrintErr("[STS2Bootstrapper] Monster intent animations prewarmed successfully!");
@@ -937,9 +918,39 @@ public partial class STS2Bootstrapper : Node
                 PrewarmMonsterIntents();
                 Callable.From(TryPreloadCurrentRunCharacter).CallDeferred();
             }
-            else if (node is MegaCrit.Sts2.Core.Nodes.NRun)
+            else if (node is MegaCrit.Sts2.Core.Nodes.NRun nRun)
             {
                 Callable.From(TryPreloadCurrentRunCharacter).CallDeferred();
+                nRun.TreeExiting += () =>
+                {
+                    GD.PrintErr("[STS2Bootstrapper] NRun exiting tree. Freeing in-run caches and running GC...");
+                    _preloadedCharacters.Clear();
+                    _permanentAssetCache.Clear();
+                    _monsterIntentsPrewarmed = false;
+                    try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Interactive; } catch { }
+                    try
+                    {
+                        GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+                        GC.WaitForPendingFinalizers();
+                        GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+                    }
+                    catch { }
+                };
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NMainMenu)
+            {
+                GD.PrintErr("[STS2Bootstrapper] Main Menu opened. Freeing in-run caches and collecting memory...");
+                _preloadedCharacters.Clear();
+                _permanentAssetCache.Clear();
+                _monsterIntentsPrewarmed = false;
+                try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Interactive; } catch { }
+                try
+                {
+                    GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+                }
+                catch { }
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect.NCharacterSelectScreen)
             {
