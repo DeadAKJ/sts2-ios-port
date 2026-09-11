@@ -71,6 +71,22 @@ jobs:
           echo "Installed Spine GDExtension to godot/addons/spine:"
           ls -la godot/addons/spine
 
+      - name: Setup FMOD GDExtension for iOS
+        run: |
+          mkdir -p /tmp/fmod_ext
+          FMOD_URL="https://github.com/utopia-rise/fmod-gdextension/releases/download/6.1.0-4.5.0/addons.zip"
+          echo "Downloading FMOD GDExtension from $FMOD_URL..."
+          curl -L -f -o /tmp/fmod_ext/fmod.zip "$FMOD_URL"
+          unzip -q /tmp/fmod_ext/fmod.zip -d /tmp/fmod_ext
+          mkdir -p godot/addons/fmod
+          cp -R /tmp/fmod_ext/fmod/* godot/addons/fmod/
+          if [ -d "godot/addons/fmod/libs/iOS" ] && [ ! -d "godot/addons/fmod/libs/ios" ]; then
+            cp -R godot/addons/fmod/libs/iOS godot/addons/fmod/libs/ios
+          fi
+          echo "Installed FMOD GDExtension to godot/addons/fmod:"
+          ls -la godot/addons/fmod
+          ls -la godot/addons/fmod/libs/ios
+
       - name: Build STS2iOS Assembly
         run: |
           mkdir -p godot/lib

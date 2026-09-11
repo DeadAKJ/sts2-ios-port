@@ -33,9 +33,25 @@ func callable_init() -> void:
 		else:
 			printerr("[STS2 Bootstrap] res://addons/spine/spine_godot_extension.gdextension not found.")
 
+	# Initialize / verify FMOD GDExtension
+	if ClassDB.class_exists("FmodServer"):
+		printerr("[STS2 Bootstrap] FmodServer is already registered in ClassDB!")
+	else:
+		printerr("[STS2 Bootstrap] FmodServer NOT registered yet. Checking GDExtension files...")
+		if FileAccess.file_exists("res://addons/fmod/fmod.gdextension"):
+			var err = GDExtensionManager.load_extension("res://addons/fmod/fmod.gdextension")
+			printerr("[STS2 Bootstrap] GDExtensionManager.load_extension for Fmod returned: ", err)
+			if ClassDB.class_exists("FmodServer"):
+				printerr("[STS2 Bootstrap] SUCCESS: FmodServer is now registered in ClassDB!")
+			else:
+				printerr("[STS2 Bootstrap] WARNING: FmodServer still not registered after load_extension.")
+		else:
+			printerr("[STS2 Bootstrap] res://addons/fmod/fmod.gdextension not found.")
+
 	# 1. Check if assets are already mounted
 	if ResourceLoader.exists("res://scenes/game.tscn"):
 		printerr("[STS2 Bootstrap] Game assets already mounted.")
+		initialize_fmod_banks()
 		launch_game()
 		return
 		
@@ -47,6 +63,7 @@ func callable_init() -> void:
 			printerr("[STS2 Bootstrap] Loaded user://SlayTheSpire2.pck successfully!")
 			update_status("Mounting game resources...", 0.85)
 			await get_tree().process_frame
+			initialize_fmod_banks()
 			launch_game()
 			return
 		else:
@@ -60,6 +77,7 @@ func callable_init() -> void:
 			printerr("[STS2 Bootstrap] Loaded res://SlayTheSpire2.pck successfully!")
 			update_status("Mounting game resources...", 0.85)
 			await get_tree().process_frame
+			initialize_fmod_banks()
 			launch_game()
 			return
 		else:
@@ -105,3 +123,21 @@ func show_missing_pck_instructions() -> void:
 		status_label.text = "Game Data Not Found!\n\nTo play Slay the Spire 2 on your iPhone:\n1. Open the 'Files' app on this iPhone (or connect to PC via iTunes/3uTools).\n2. Go to: 'On My iPhone' -> 'Slay the Spire 2'.\n3. Copy your 'SlayTheSpire2.pck' file into that folder.\n4. Close and re-open this app."
 	if progress_bar:
 		progress_bar.visible = false
+
+func initialize_fmod_banks() -> void:
+	if ClassDB.class_exists("FmodServer"):
+		var fmod_server = Engine.get_singleton("FmodServer")
+		if fmod_server:
+			printerr("[STS2 Bootstrap] Initializing FMOD and loading master banks...")
+			var banks = [
+				"res://banks/desktop/Master.strings.bank",
+				"res://banks/desktop/Master.bank",
+				"res://banks/desktop/sfx.bank",
+				"res://banks/desktop/ambience.bank"
+			]
+			for b in banks:
+				if FileAccess.file_exists(b):
+					fmod_server.call("load_bank", b, 0)
+					printerr("[STS2 Bootstrap] Loaded bank: ", b)
+				else:
+					printerr("[STS2 Bootstrap] Bank file not found: ", b)

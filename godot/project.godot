@@ -30,6 +30,12 @@ pointing/emulate_mouse_from_touch=true
 [autoload]
 
 STS2Bootstrapper="*res://src/STS2Bootstrapper.cs"
+FmodManager="*res://addons/fmod/FmodManager.gd"
+
+[Fmod]
+
+General/banks_path="res://banks/desktop"
+General/is_live_update_enabled=false
 
 [dotnet]
 

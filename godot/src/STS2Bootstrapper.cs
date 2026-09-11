@@ -105,10 +105,9 @@ public partial class STS2Bootstrapper : Node
         // 2009 is NotificationOsMemoryWarning in Godot
         if (what == 2009)
         {
-            GD.PrintErr("[STS2Bootstrapper] OS Low Memory Warning received! Evicting missed cache assets and collecting garbage...");
+            GD.PrintErr("[STS2Bootstrapper] OS Low Memory Warning received! Collecting GC heap...");
             try
             {
-                MegaCrit.Sts2.Core.Assets.PreloadManager.Cache.UnloadMissedCacheAssets();
                 GC.Collect(2, GCCollectionMode.Aggressive, true, true);
                 GC.WaitForPendingFinalizers();
             }
@@ -331,11 +330,68 @@ public partial class STS2Bootstrapper : Node
         {
             // Disable background preloading of 778 assets to prevent iOS Jetsam OOM kills on startup
             MegaCrit.Sts2.Core.Assets.PreloadManager.Enabled = false;
+            ClearMissedCacheAssets();
             GD.PrintErr("[STS2Bootstrapper] Set PreloadManager.Enabled = false (on-demand loading enabled to prevent iOS memory spikes).");
         }
         catch (Exception ex)
         {
             GD.PrintErr($"[STS2Bootstrapper] Failed to configure PreloadManager: {ex}");
+        }
+    }
+
+    public static void ClearMissedCacheAssets()
+    {
+        try
+        {
+            var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
+            var missedField = typeof(MegaCrit.Sts2.Core.Assets.AssetCache).GetField("_missedCacheAssets", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (missedField?.GetValue(cache) is HashSet<string> missedSet)
+            {
+                missedSet.Clear();
+            }
+        }
+        catch { }
+    }
+
+    private static void PrewarmCombatEssentials()
+    {
+        try
+        {
+            var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
+            string[] essentials = new string[]
+            {
+                "res://materials/transitions/fade_transition_mat.tres",
+                "res://materials/transitions/ironclad_transition_mat.tres",
+                "res://scenes/vfx/hit_spark_vfx.tscn",
+                "res://scenes/vfx/block_spark_vfx.tscn",
+                "res://scenes/vfx/block_broken_vfx.tscn",
+                "res://scenes/vfx/damage_blocked_vfx.tscn",
+                "res://scenes/vfx/damage_num_vfx.tscn",
+                "res://scenes/vfx/cards/card_fly_vfx.tscn",
+                "res://scenes/vfx/cards/card_fly_power_vfx.tscn",
+                "res://scenes/vfx/cards/card_fly_shuffle_vfx.tscn",
+                "res://scenes/vfx/cards/card_exhaust_vfx.tscn",
+                "res://debug_audio/blunt_attack.mp3",
+                "res://debug_audio/slash_attack.mp3",
+                "res://debug_audio/heavy_attack.mp3",
+                "res://debug_audio/card_select.mp3",
+                "res://debug_audio/card_deal.mp3",
+                "res://debug_audio/player_turn.mp3",
+                "res://debug_audio/enemy_turn.mp3"
+            };
+            foreach (var path in essentials)
+            {
+                if (!cache.ContainsKey(path) && ResourceLoader.Exists(path))
+                {
+                    cache.GetAsset<Resource>(path);
+                }
+            }
+            ClearMissedCacheAssets();
+            GD.PrintErr("[STS2Bootstrapper] Pre-warmed combat essentials into AssetCache (zero attack/hit stutter).");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Failed to prewarm combat essentials: {ex.Message}");
         }
     }
 
@@ -363,7 +419,13 @@ public partial class STS2Bootstrapper : Node
     {
         try
         {
-            if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NMapScreen mapScreen)
+            ClearMissedCacheAssets();
+
+            if (node is MegaCrit.Sts2.Core.Nodes.Rooms.NCombatRoom)
+            {
+                PrewarmCombatEssentials();
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NMapScreen mapScreen)
             {
                 mapScreen.Visible = false;
                 mapScreen.ProcessMode = Node.ProcessModeEnum.Disabled;
