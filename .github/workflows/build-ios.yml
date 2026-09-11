@@ -124,22 +124,7 @@ jobs:
           find . -type f \( -name "*.mm" -o -name "*.m" -o -name "*.cpp" \) | while read -r src; do
             if grep -q "UIApplicationMain" "$src" 2>/dev/null || grep -q "main(" "$src" 2>/dev/null; then
               echo "Injecting load_all_fmod_plugins into $src..."
-              cat << 'EOF' >> "$src"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-__attribute__((visibility("default"))) __attribute__((used))
-uint32_t* load_all_fmod_plugins(void* p_interface, uint32_t* r_count) {
-    if (r_count) {
-        *r_count = 0;
-    }
-    return 0;
-}
-#ifdef __cplusplus
-}
-#endif
-EOF
+              printf '\n#ifdef __cplusplus\nextern "C" {\n#endif\n__attribute__((visibility("default"))) __attribute__((used))\nuint32_t* load_all_fmod_plugins(void* p_interface, uint32_t* r_count) {\n    if (r_count) { *r_count = 0; }\n    return 0;\n}\n#ifdef __cplusplus\n}\n#endif\n' >> "$src"
             fi
           done
           
