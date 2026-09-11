@@ -197,14 +197,12 @@ jobs:
           cp godot/addons/spine/spine_godot_extension.gdextension "$APP_DIR/addons/spine/" 2>/dev/null || true
           cp -R godot/addons/spine/ios/* "$APP_DIR/addons/spine/ios/" 2>/dev/null || true
 
-          # 4c. Embed FMOD GDExtension and addons
-          echo "Embedding FMOD addons into $APP_DIR/addons/fmod/..."
+          # 4c. Embed FMOD GDExtension scripts into bundle
+          echo "Embedding FMOD scripts into $APP_DIR/addons/fmod/..."
           mkdir -p "$APP_DIR/addons/fmod"
-          cp -R godot/addons/fmod/* "$APP_DIR/addons/fmod/" 2>/dev/null || true
-          if [ -d "godot/addons/fmod/libs/ios/libGodotFmod.ios.template_release.xcframework" ]; then
-            echo "Embedding FMOD xcframework into $APP_DIR/Frameworks/..."
-            cp -R godot/addons/fmod/libs/ios/libGodotFmod.ios.template_release.xcframework "$APP_DIR/Frameworks/" 2>/dev/null || true
-          fi
+          cp godot/addons/fmod/fmod.gdextension "$APP_DIR/addons/fmod/" 2>/dev/null || true
+          cp godot/addons/fmod/FmodManager.gd "$APP_DIR/addons/fmod/" 2>/dev/null || true
+          cp -R godot/addons/fmod/icons "$APP_DIR/addons/fmod/" 2>/dev/null || true
 
           # 5. Copy managed game assemblies
           mkdir -p "$APP_DIR/assemblies"
