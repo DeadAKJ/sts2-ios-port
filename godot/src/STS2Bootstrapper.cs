@@ -94,6 +94,12 @@ public partial class STS2Bootstrapper : Node
                 GD.PrintErr(line);
                 try { System.IO.File.AppendAllText(LogFilePath, line + "\n"); } catch { }
 
+                // Prevent missed asset unload thrashing
+                if (text != null && text.Contains("Asset was not cached:"))
+                {
+                    ClearMissedCacheAssets();
+                }
+
                 // Clean exit on main menu quit
                 if (text != null && text.Contains("NGame.Quit called"))
                 {
@@ -151,6 +157,7 @@ public partial class STS2Bootstrapper : Node
     public override void _Process(double delta)
     {
         EnforceFullscreenAndTouchSettings();
+        ClearMissedCacheAssets();
 
         _memoryLogTimer += delta;
         if (_memoryLogTimer >= 10.0)
@@ -422,15 +429,322 @@ public partial class STS2Bootstrapper : Node
         }
     }
 
+    private static readonly Dictionary<string, Resource> _permanentAssetCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> _preloadedCharacters = new(StringComparer.OrdinalIgnoreCase);
+    private static bool _monsterIntentsPrewarmed = false;
+
     public static void ClearMissedCacheAssets()
     {
         try
         {
             var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
-            var missedField = typeof(MegaCrit.Sts2.Core.Assets.AssetCache).GetField("_missedCacheAssets", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (missedField?.GetValue(cache) is HashSet<string> missedSet)
+            if (cache == null) return;
+
+            var cacheType = typeof(MegaCrit.Sts2.Core.Assets.AssetCache);
+            var missedField = cacheType.GetField("_missedCacheAssets", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (missedField?.GetValue(cache) is HashSet<string> missedSet && missedSet.Count > 0)
             {
                 missedSet.Clear();
+            }
+
+            var cacheField = cacheType.GetField("_cache", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (cacheField?.GetValue(cache) is System.Collections.IDictionary dict)
+            {
+                // Mirror all loaded assets into permanent cache so they never get garbage collected
+                foreach (System.Collections.DictionaryEntry entry in dict)
+                {
+                    if (entry.Key is string key && entry.Value is Resource res && GodotObject.IsInstanceValid(res))
+                    {
+                        if (!_permanentAssetCache.ContainsKey(key))
+                        {
+                            _permanentAssetCache[key] = res;
+                        }
+                    }
+                }
+
+                // If any asset was removed by MegaCrit, restore it immediately
+                foreach (var kvp in _permanentAssetCache)
+                {
+                    if (!dict.Contains(kvp.Key) && GodotObject.IsInstanceValid(kvp.Value))
+                    {
+                        dict[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    public static void PrewarmMonsterIntents()
+    {
+        if (_monsterIntentsPrewarmed) return;
+        _monsterIntentsPrewarmed = true;
+
+        try
+        {
+            var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
+            if (cache == null) return;
+
+            void TryLoad(string path)
+            {
+                try
+                {
+                    if (ResourceLoader.Exists(path))
+                    {
+                        var res = cache.GetAsset<Resource>(path);
+                        if (res != null) _permanentAssetCache[path] = res;
+                    }
+                }
+                catch { }
+            }
+
+            // Defend (00 - 45)
+            for (int i = 0; i <= 45; i++)
+                TryLoad($"res://images/atlases/intent_atlas.sprites/defend/intent_defend_{i:D2}.tres");
+
+            // Buff (00 - 30)
+            for (int i = 0; i <= 30; i++)
+                TryLoad($"res://images/atlases/intent_atlas.sprites/buff/intent_buff_{i:D2}.tres");
+
+            // Debuff (00 - 30)
+            for (int i = 0; i <= 30; i++)
+                TryLoad($"res://images/atlases/intent_atlas.sprites/debuff/intent_debuff_{i:D2}.tres");
+
+            // MegaDebuff (00 - 15)
+            for (int i = 0; i <= 15; i++)
+                TryLoad($"res://images/atlases/intent_atlas.sprites/debuff/intent_megadebuff_{i:D2}.tres");
+
+            // Status (00 - 20)
+            for (int i = 0; i <= 20; i++)
+                TryLoad($"res://images/atlases/intent_statuscard.sprites/status/intent_statuscard_{i:D2}.tres");
+            for (int i = 0; i <= 20; i++)
+                TryLoad($"res://images/atlases/intent_atlas.sprites/status/intent_statuscard_{i:D2}.tres");
+
+            // Attacks (1 - 10)
+            for (int i = 1; i <= 10; i++)
+            {
+                TryLoad($"res://images/atlases/intent_atlas.sprites/attack/intent_attack_{i}.png");
+                TryLoad($"res://images/atlases/intent_atlas.sprites/attack/intent_attack_{i:D2}.tres");
+            }
+
+            // Special statuses
+            for (int i = 0; i <= 20; i++)
+            {
+                TryLoad($"res://images/atlases/intent_atlas.sprites/sleep/intent_sleep_{i:D2}.tres");
+                TryLoad($"res://images/atlases/intent_atlas.sprites/stun/intent_stun_{i:D2}.tres");
+                TryLoad($"res://images/atlases/intent_atlas.sprites/curse/intent_curse_{i:D2}.tres");
+                TryLoad($"res://images/atlases/intent_atlas.sprites/death/intent_death_{i:D2}.tres");
+                TryLoad($"res://images/atlases/intent_atlas.sprites/escape/intent_escape_{i:D2}.tres");
+            }
+
+            ClearMissedCacheAssets();
+            GD.PrintErr("[STS2Bootstrapper] Monster intent animations prewarmed successfully!");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Error prewarming monster intents: {ex.Message}");
+        }
+    }
+
+    public static void PreloadCharacterAssets(MegaCrit.Sts2.Core.Models.CharacterModel character)
+    {
+        if (character == null) return;
+        string charId = character.Id?.ToString() ?? character.GetType().Name;
+        if (_preloadedCharacters.Contains(charId)) return;
+        _preloadedCharacters.Add(charId);
+
+        GD.PrintErr($"[STS2Bootstrapper] Preloading all assets for active character: {charId}...");
+
+        try
+        {
+            var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
+            if (cache == null) return;
+
+            void TryLoad(string? path)
+            {
+                if (string.IsNullOrEmpty(path)) return;
+                try
+                {
+                    if (ResourceLoader.Exists(path))
+                    {
+                        var res = cache.GetAsset<Resource>(path);
+                        if (res != null) _permanentAssetCache[path] = res;
+                    }
+                }
+                catch { }
+            }
+
+            // 1. Character model base assets
+            if (character.AssetPaths != null)
+            {
+                foreach (var path in character.AssetPaths)
+                {
+                    TryLoad(path);
+                }
+            }
+            if (character.ExtraAssetPaths != null)
+            {
+                foreach (var path in character.ExtraAssetPaths)
+                {
+                    TryLoad(path);
+                }
+            }
+            TryLoad(character.TrailPath);
+            TryLoad(character.VisualsPath);
+            TryLoad(character.IconTexturePath);
+            TryLoad(character.EnergyCounterPath);
+
+            // 2. Character Card Pool
+            var cardPool = character.CardPool;
+            if (cardPool != null)
+            {
+                TryLoad(cardPool.CardFrameMaterialPath);
+                TryLoad(cardPool.FrameMaterialPath);
+                TryLoad(cardPool.EnergyIconPath);
+
+                var allCards = cardPool.AllCards;
+                if (allCards != null)
+                {
+                    int cardCount = 0;
+                    foreach (var card in allCards)
+                    {
+                        if (card == null) continue;
+                        cardCount++;
+                        TryLoad(card.PortraitPath);
+                        TryLoad(card.PortraitPngPath);
+                        TryLoad(card.FramePath);
+                        TryLoad(card.BannerMaterialPath);
+                        TryLoad(card.BannerTexturePath);
+                        TryLoad(card.EnergyIconPath);
+                        TryLoad(card.OverlayPath);
+
+                        if (card.RunAssetPaths != null)
+                        {
+                            foreach (var p in card.RunAssetPaths) TryLoad(p);
+                        }
+                        if (card.ExtraRunAssetPaths != null)
+                        {
+                            foreach (var p in card.ExtraRunAssetPaths) TryLoad(p);
+                        }
+                    }
+                    GD.PrintErr($"[STS2Bootstrapper] Preloaded {cardCount} cards for character {charId}!");
+                }
+            }
+
+            // 3. Signature character VFX and powers
+            string lowerName = charId.ToLowerInvariant();
+            if (lowerName.Contains("silent"))
+            {
+                string[] silentAssets = new string[]
+                {
+                    "res://materials/cards/frames/card_frame_green_mat.tres",
+                    "res://scenes/vfx/vfx_shiv_throw.tscn",
+                    "res://scenes/vfx/thin_slice_vfx.tscn",
+                    "res://scenes/vfx/vfx_dagger_spray_flurry.tscn",
+                    "res://scenes/vfx/vfx_dagger_spray_impact.tscn",
+                    "res://scenes/vfx/cards/exhaust_vfx.tscn",
+                    "res://scenes/vfx/cards/card_exhaust_vfx.tscn",
+                    "res://debug_audio/card_exhaust.mp3",
+                    "res://images/powers/poison_power.png",
+                    "res://images/powers/accuracy_power.png",
+                    "res://images/powers/after_image_power.png",
+                    "res://images/powers/infinite_blades_power.png",
+                    "res://images/powers/noxious_fumes_power.png",
+                    "res://images/powers/choke_power.png",
+                    "res://images/powers/envenom_power.png",
+                    "res://images/powers/thousand_cuts_power.png",
+                    "res://images/powers/burst_power.png",
+                    "res://images/powers/tools_of_the_trade_power.png",
+                    "res://images/powers/corpse_explosion_power.png",
+                    "res://images/powers/phantasmal_killer_power.png",
+                    "res://images/powers/bullet_time_power.png",
+                    "res://images/powers/tactician_power.png",
+                    "res://images/powers/reflex_power.png",
+                    "res://images/powers/wraith_form_power.png"
+                };
+                foreach (var p in silentAssets) TryLoad(p);
+            }
+            else if (lowerName.Contains("ironclad"))
+            {
+                string[] ironcladAssets = new string[]
+                {
+                    "res://materials/cards/frames/card_frame_red_mat.tres",
+                    "res://scenes/vfx/vfx_attack_slash.tscn",
+                    "res://scenes/vfx/vfx_attack_blunt.tscn",
+                    "res://scenes/vfx/vfx_heavy_blunt.tscn",
+                    "res://scenes/vfx/vfx_big_slash.tscn",
+                    "res://scenes/vfx/vfx_big_slash_impact.tscn",
+                    "res://scenes/vfx/vfx_fire_burning.tscn",
+                    "res://images/powers/strength_power.png",
+                    "res://images/powers/metallicize_power.png",
+                    "res://images/powers/barricade_power.png",
+                    "res://images/powers/flame_barrier_power.png",
+                    "res://images/powers/feel_no_pain_power.png",
+                    "res://images/powers/dark_embrace_power.png",
+                    "res://images/powers/corruption_power.png",
+                    "res://images/powers/demon_form_power.png",
+                    "res://images/powers/inflame_power.png",
+                    "res://images/powers/berserk_power.png",
+                    "res://images/powers/rupture_power.png",
+                    "res://images/powers/juggernaut_power.png",
+                    "res://images/powers/brutality_power.png",
+                    "res://images/powers/combust_power.png"
+                };
+                foreach (var p in ironcladAssets) TryLoad(p);
+            }
+            else if (lowerName.Contains("defect"))
+            {
+                string[] defectAssets = new string[]
+                {
+                    "res://materials/cards/frames/card_frame_blue_mat.tres",
+                    "res://scenes/vfx/vfx_attack_lightning.tscn",
+                    "res://images/powers/focus_power.png",
+                    "res://images/powers/electrodynamics_power.png",
+                    "res://images/powers/loop_power.png",
+                    "res://images/powers/defragment_power.png",
+                    "res://images/powers/biased_cognition_power.png",
+                    "res://images/powers/echo_form_power.png",
+                    "res://images/powers/creative_ai_power.png",
+                    "res://images/powers/buffer_power.png",
+                    "res://images/powers/static_discharge_power.png",
+                    "res://images/powers/storm_power.png",
+                    "res://images/powers/heatsinks_power.png"
+                };
+                foreach (var p in defectAssets) TryLoad(p);
+            }
+
+            ClearMissedCacheAssets();
+            GD.PrintErr($"[STS2Bootstrapper] Completed character preloading for {charId}. Total cached assets: {_permanentAssetCache.Count}");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Error preloading character assets: {ex.Message}");
+        }
+    }
+
+    public static void TryPreloadCurrentRunCharacter()
+    {
+        try
+        {
+            var run = MegaCrit.Sts2.Core.Nodes.NRun.Instance;
+            if (run != null)
+            {
+                var stateField = typeof(MegaCrit.Sts2.Core.Nodes.NRun).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (stateField?.GetValue(run) is MegaCrit.Sts2.Core.Runs.IRunState runState)
+                {
+                    var playersProp = runState.GetType().GetProperty("Players") ?? typeof(MegaCrit.Sts2.Core.Runs.RunState).GetProperty("Players");
+                    if (playersProp?.GetValue(runState) is System.Collections.IEnumerable players)
+                    {
+                        foreach (var player in players)
+                        {
+                            var charProp = player.GetType().GetProperty("Character");
+                            if (charProp?.GetValue(player) is MegaCrit.Sts2.Core.Models.CharacterModel character)
+                            {
+                                PreloadCharacterAssets(character);
+                            }
+                        }
+                    }
+                }
             }
         }
         catch { }
@@ -441,17 +755,26 @@ public partial class STS2Bootstrapper : Node
         try
         {
             var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
+            if (cache == null) return;
+
             string[] essentials = new string[]
             {
                 // Core Transitions & UI Materials
                 "res://materials/transitions/fade_transition_mat.tres",
                 "res://materials/transitions/ironclad_transition_mat.tres",
                 "res://materials/ui/hover_tip_debuff.tres",
+                "res://materials/ui/card_hover_tip_mat.tres",
                 "res://materials/cards/banners/card_banner_common_mat.tres",
                 "res://materials/cards/banners/card_banner_uncommon_mat.tres",
                 "res://materials/cards/banners/card_banner_rare_mat.tres",
                 "res://materials/cards/frames/card_frame_red_mat.tres",
+                "res://materials/cards/frames/card_frame_green_mat.tres",
+                "res://materials/cards/frames/card_frame_blue_mat.tres",
                 "res://materials/cards/frames/card_frame_colorless_mat.tres",
+
+                // Card UI & Holders
+                "res://scenes/cards/holders/selected_hand_card_holder.tscn",
+                "res://scenes/ui/card_hover_tip.tscn",
 
                 // Attack VFX (eliminates card play & attack lag spikes!)
                 "res://scenes/vfx/vfx_attack_slash.tscn",
@@ -467,6 +790,9 @@ public partial class STS2Bootstrapper : Node
                 "res://scenes/vfx/vfx_scratch.tscn",
                 "res://scenes/vfx/vfx_bite.tscn",
                 "res://scenes/vfx/hit_spark_vfx.tscn",
+                "res://scenes/vfx/vfx_slime_impact.tscn",
+                "res://scenes/vfx/vfx_goopy_impact.tscn",
+                "res://scenes/vfx/vfx_fire_burning.tscn",
 
                 // Defense & Damage VFX
                 "res://scenes/vfx/vfx_block.tscn",
@@ -508,6 +834,7 @@ public partial class STS2Bootstrapper : Node
                 "res://scenes/vfx/cards/card_fly_power_vfx.tscn",
                 "res://scenes/vfx/cards/card_fly_shuffle_vfx.tscn",
                 "res://scenes/vfx/cards/card_exhaust_vfx.tscn",
+                "res://scenes/vfx/cards/exhaust_vfx.tscn",
 
                 // Common Power PNGs
                 "res://images/powers/vulnerable_power.png",
@@ -524,6 +851,9 @@ public partial class STS2Bootstrapper : Node
                 "res://images/powers/artifact_power.png",
                 "res://images/powers/intangible_power.png",
                 "res://images/powers/thorns_power.png",
+                "res://images/powers/shrink_power.png",
+                "res://images/powers/flame_barrier_power.png",
+                "res://images/powers/mayhem_power.png",
 
                 // Combat Audio
                 "res://debug_audio/blunt_attack.mp3",
@@ -531,16 +861,19 @@ public partial class STS2Bootstrapper : Node
                 "res://debug_audio/heavy_attack.mp3",
                 "res://debug_audio/card_select.mp3",
                 "res://debug_audio/card_deal.mp3",
+                "res://debug_audio/card_exhaust.mp3",
                 "res://debug_audio/player_turn.mp3",
                 "res://debug_audio/enemy_turn.mp3",
                 "res://debug_audio/battle_start_1.mp3",
                 "res://debug_audio/victory.mp3"
             };
+
             foreach (var path in essentials)
             {
                 if (!cache.ContainsKey(path) && ResourceLoader.Exists(path))
                 {
-                    cache.GetAsset<Resource>(path);
+                    var res = cache.GetAsset<Resource>(path);
+                    if (res != null) _permanentAssetCache[path] = res;
                 }
             }
             ClearMissedCacheAssets();
@@ -580,10 +913,23 @@ public partial class STS2Bootstrapper : Node
 
             if (node is MegaCrit.Sts2.Core.Nodes.Rooms.NCombatRoom)
             {
+                try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency; } catch { }
                 PrewarmCombatEssentials();
+                PrewarmMonsterIntents();
+                Callable.From(TryPreloadCurrentRunCharacter).CallDeferred();
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.NRun)
+            {
+                Callable.From(TryPreloadCurrentRunCharacter).CallDeferred();
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect.NCharacterSelectScreen)
+            {
+                PrewarmMonsterIntents();
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NMapScreen mapScreen)
             {
+                try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Interactive; } catch { }
+                try { GC.Collect(1, GCCollectionMode.Optimized); } catch { }
                 mapScreen.Visible = false;
                 mapScreen.ProcessMode = Node.ProcessModeEnum.Disabled;
                 GD.PrintErr("[STS2Bootstrapper] Initialized NMapScreen: Visible = false, ProcessMode = Disabled");
@@ -655,6 +1001,11 @@ public partial class STS2Bootstrapper : Node
                 {
                     nCreature.Ready += () => GuardCreatureHitboxAndReticle(nCreature);
                 }
+                nCreature.ChildEnteredTree += (child) =>
+                {
+                    GuardCreatureHitboxAndReticle(nCreature);
+                    if (nCreature.Visuals != null) GuardCreatureVisuals(nCreature.Visuals);
+                };
                 Callable.From(() => GuardCreatureHitboxAndReticle(nCreature)).CallDeferred();
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NCreatureVisuals nVisuals)
@@ -798,12 +1149,15 @@ public partial class STS2Bootstrapper : Node
             {
                 var centerPos = visuals.GetNodeOrNull<Marker2D>("%CenterPos")
                              ?? visuals.GetNodeOrNull<Marker2D>("CenterPos")
+                             ?? visuals.GetNodeOrNull<Marker2D>("%VfxSpawnPos")
+                             ?? visuals.GetNodeOrNull<Marker2D>("VfxSpawnPos")
                              ?? new Marker2D { Name = "CenterPos" };
                 if (!centerPos.IsInsideTree())
                 {
                     visuals.AddChild(centerPos);
                 }
                 cvType.GetProperty("VfxSpawnPosition", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.SetValue(visuals, centerPos);
+                cvType.GetField("<VfxSpawnPosition>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(visuals, centerPos);
             }
 
             if (visuals.Bounds == null)
@@ -817,6 +1171,7 @@ public partial class STS2Bootstrapper : Node
                     visuals.AddChild(bounds);
                 }
                 cvType.GetProperty("Bounds", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.SetValue(visuals, bounds);
+                cvType.GetField("<Bounds>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(visuals, bounds);
             }
             else
             {
@@ -833,6 +1188,7 @@ public partial class STS2Bootstrapper : Node
                     visuals.AddChild(intentPos);
                 }
                 cvType.GetProperty("IntentPosition", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.SetValue(visuals, intentPos);
+                cvType.GetField("<IntentPosition>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(visuals, intentPos);
             }
         }
         catch (Exception ex)
