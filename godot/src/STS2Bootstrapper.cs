@@ -100,7 +100,7 @@ public partial class STS2Bootstrapper : Node
                     GD.PrintErr("[STS2Bootstrapper] Detected NGame.Quit called! Terminating process in 500ms after saves flush...");
                     System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
                     {
-                        try { Environment.Exit(0); } catch { }
+                        try { System.Environment.Exit(0); } catch { }
                     });
                 }
             };
@@ -142,7 +142,7 @@ public partial class STS2Bootstrapper : Node
             }
             catch { }
         }
-        else if (what == (int)NotificationWmSizeChanged || what == 1005 /* NotificationResized */)
+        else if (what == (int)Window.NotificationWMSizeChanged || what == 1005 /* NotificationResized */)
         {
             EnforceFullscreenAndTouchSettings();
         }
