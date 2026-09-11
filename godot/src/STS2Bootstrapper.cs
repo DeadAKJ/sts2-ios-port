@@ -40,6 +40,7 @@ public partial class STS2Bootstrapper : Node
         RegisterInputMapActions();
         ConfigureCommandLine();
         ConfigureSteamStubResolver();
+        ConfigureMemoryManagement();
         HookSceneTree();
     }
 
@@ -51,6 +52,7 @@ public partial class STS2Bootstrapper : Node
         RegisterInputMapActions();
         ConfigureCommandLine();
         ConfigureSteamStubResolver();
+        ConfigureMemoryManagement();
         HookSceneTree();
     }
 
@@ -96,8 +98,40 @@ public partial class STS2Bootstrapper : Node
         }
     }
 
+    private double _memoryLogTimer = 0;
+
+    public override void _Notification(int what)
+    {
+        // 2009 is NotificationOsMemoryWarning in Godot
+        if (what == 2009)
+        {
+            GD.PrintErr("[STS2Bootstrapper] OS Low Memory Warning received! Evicting missed cache assets and collecting garbage...");
+            try
+            {
+                MegaCrit.Sts2.Core.Assets.PreloadManager.Cache.UnloadMissedCacheAssets();
+                GC.Collect(2, GCCollectionMode.Aggressive, true, true);
+                GC.WaitForPendingFinalizers();
+            }
+            catch { }
+        }
+    }
+
     public override void _Process(double delta)
     {
+        _memoryLogTimer += delta;
+        if (_memoryLogTimer >= 10.0)
+        {
+            _memoryLogTimer = 0;
+            try
+            {
+                long staticMem = (long)OS.GetStaticMemoryUsage();
+                long vram = (long)RenderingServer.GetRenderingInfo(RenderingServer.RenderingInfo.VideoMemUsed);
+                long gcMem = GC.GetTotalMemory(false);
+                GD.PrintErr($"[STS2Bootstrapper] Memory Telemetry: Static={staticMem / (1024 * 1024)}MB, VRAM={vram / (1024 * 1024)}MB, GC={gcMem / (1024 * 1024)}MB");
+            }
+            catch { }
+        }
+
         // On iOS without an external gamepad, force mouse/touch mode if NControllerManager accidentally engages controller mode
         try
         {
@@ -283,6 +317,25 @@ public partial class STS2Bootstrapper : Node
         catch (Exception ex)
         {
             GD.PrintErr($"[STS2Bootstrapper] Exception in ConfigureJsonSerialization: {ex}");
+        }
+    }
+
+    private static bool _memoryConfigured = false;
+
+    public static void ConfigureMemoryManagement()
+    {
+        if (_memoryConfigured) return;
+        _memoryConfigured = true;
+
+        try
+        {
+            // Disable background preloading of 778 assets to prevent iOS Jetsam OOM kills on startup
+            MegaCrit.Sts2.Core.Assets.PreloadManager.Enabled = false;
+            GD.PrintErr("[STS2Bootstrapper] Set PreloadManager.Enabled = false (on-demand loading enabled to prevent iOS memory spikes).");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Failed to configure PreloadManager: {ex}");
         }
     }
 
