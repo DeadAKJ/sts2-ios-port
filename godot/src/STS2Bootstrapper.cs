@@ -574,6 +574,24 @@ public partial class STS2Bootstrapper : Node
                 catch { }
             }
 
+            void TryLoadReflected(object obj, string propName)
+            {
+                try
+                {
+                    var prop = obj.GetType().GetProperty(propName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (prop != null)
+                    {
+                        var val = prop.GetValue(obj);
+                        if (val is string strVal) TryLoad(strVal);
+                        else if (val is IEnumerable<string> strList)
+                        {
+                            foreach (var item in strList) TryLoad(item);
+                        }
+                    }
+                }
+                catch { }
+            }
+
             // 1. Character model base assets
             if (character.AssetPaths != null)
             {
@@ -582,17 +600,19 @@ public partial class STS2Bootstrapper : Node
                     TryLoad(path);
                 }
             }
-            if (character.ExtraAssetPaths != null)
-            {
-                foreach (var path in character.ExtraAssetPaths)
-                {
-                    TryLoad(path);
-                }
-            }
             TryLoad(character.TrailPath);
-            TryLoad(character.VisualsPath);
-            TryLoad(character.IconTexturePath);
             TryLoad(character.EnergyCounterPath);
+            TryLoad(character.MerchantAnimPath);
+            TryLoad(character.RestSiteAnimPath);
+            TryLoad(character.CharacterSelectTransitionPath);
+            if (character.AssetPathsCharacterSelect != null)
+            {
+                foreach (var path in character.AssetPathsCharacterSelect) TryLoad(path);
+            }
+            TryLoadReflected(character, "VisualsPath");
+            TryLoadReflected(character, "IconTexturePath");
+            TryLoadReflected(character, "IconPath");
+            TryLoadReflected(character, "ExtraAssetPaths");
 
             // 2. Character Card Pool
             var cardPool = character.CardPool;
@@ -611,21 +631,20 @@ public partial class STS2Bootstrapper : Node
                         if (card == null) continue;
                         cardCount++;
                         TryLoad(card.PortraitPath);
-                        TryLoad(card.PortraitPngPath);
-                        TryLoad(card.FramePath);
-                        TryLoad(card.BannerMaterialPath);
-                        TryLoad(card.BannerTexturePath);
-                        TryLoad(card.EnergyIconPath);
+                        TryLoad(card.BetaPortraitPath);
                         TryLoad(card.OverlayPath);
 
                         if (card.RunAssetPaths != null)
                         {
                             foreach (var p in card.RunAssetPaths) TryLoad(p);
                         }
-                        if (card.ExtraRunAssetPaths != null)
-                        {
-                            foreach (var p in card.ExtraRunAssetPaths) TryLoad(p);
-                        }
+
+                        TryLoadReflected(card, "PortraitPngPath");
+                        TryLoadReflected(card, "FramePath");
+                        TryLoadReflected(card, "BannerMaterialPath");
+                        TryLoadReflected(card, "BannerTexturePath");
+                        TryLoadReflected(card, "EnergyIconPath");
+                        TryLoadReflected(card, "ExtraRunAssetPaths");
                     }
                     GD.PrintErr($"[STS2Bootstrapper] Preloaded {cardCount} cards for character {charId}!");
                 }
