@@ -375,7 +375,15 @@ public partial class STS2Bootstrapper : Node
                 }
 
                 // Guard hitbox and selection reticle to eliminate combat hover lag
-                nCreature.CallDeferred(Callable.From(() => GuardCreatureHitboxAndReticle(nCreature)));
+                if (nCreature.IsNodeReady())
+                {
+                    GuardCreatureHitboxAndReticle(nCreature);
+                }
+                else
+                {
+                    nCreature.Ready += () => GuardCreatureHitboxAndReticle(nCreature);
+                }
+                Callable.From(() => GuardCreatureHitboxAndReticle(nCreature)).CallDeferred();
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NCreatureVisuals nVisuals)
             {
