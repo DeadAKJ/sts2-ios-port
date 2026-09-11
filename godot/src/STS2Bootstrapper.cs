@@ -53,6 +53,13 @@ public partial class STS2Bootstrapper : Node
         ConfigureSteamStubResolver();
         ConfigureMemoryManagement();
         HookSceneTree();
+        EnforceFullscreenAndTouchSettings();
+    }
+
+    public override void _Ready()
+    {
+        base._Ready();
+        EnforceFullscreenAndTouchSettings();
     }
 
     public void EnsureRegistered()
@@ -65,6 +72,7 @@ public partial class STS2Bootstrapper : Node
         ConfigureSteamStubResolver();
         ConfigureMemoryManagement();
         HookSceneTree();
+        EnforceFullscreenAndTouchSettings();
     }
 
     public static void InitFileLogger()
@@ -85,6 +93,16 @@ public partial class STS2Bootstrapper : Node
                 string line = $"[{DateTime.UtcNow:HH:mm:ss.fff}] [{level}] {text}";
                 GD.PrintErr(line);
                 try { System.IO.File.AppendAllText(LogFilePath, line + "\n"); } catch { }
+
+                // Clean exit on main menu quit
+                if (text != null && text.Contains("NGame.Quit called"))
+                {
+                    GD.PrintErr("[STS2Bootstrapper] Detected NGame.Quit called! Terminating process in 500ms after saves flush...");
+                    System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+                    {
+                        try { Environment.Exit(0); } catch { }
+                    });
+                }
             };
 
             // Hook Unhandled Exceptions
@@ -124,10 +142,16 @@ public partial class STS2Bootstrapper : Node
             }
             catch { }
         }
+        else if (what == (int)NotificationWmSizeChanged || what == 1005 /* NotificationResized */)
+        {
+            EnforceFullscreenAndTouchSettings();
+        }
     }
 
     public override void _Process(double delta)
     {
+        EnforceFullscreenAndTouchSettings();
+
         _memoryLogTimer += delta;
         if (_memoryLogTimer >= 10.0)
         {
@@ -158,6 +182,53 @@ public partial class STS2Bootstrapper : Node
                         .GetMethod("ControlModeChanged", BindingFlags.Instance | BindingFlags.NonPublic);
                     method?.Invoke(ctrlMgr, null);
                     GD.Print("[STS2Bootstrapper] Reset NControllerManager to Touch/Mouse mode.");
+                }
+            }
+        }
+        catch { }
+    }
+
+    private static bool _fullscreenLogged = false;
+
+    public static void EnforceFullscreenAndTouchSettings()
+    {
+        try
+        {
+            var window = Instance?.GetTree()?.Root;
+            if (window != null)
+            {
+                if (window.ContentScaleAspect != Window.ContentScaleAspectEnum.Expand)
+                {
+                    window.ContentScaleAspect = Window.ContentScaleAspectEnum.Expand;
+                    if (!_fullscreenLogged)
+                    {
+                        GD.PrintErr("[STS2Bootstrapper] Enforced Window.ContentScaleAspect = Expand (fullscreen edge-to-edge).");
+                    }
+                }
+                if (window.ContentScaleMode != Window.ContentScaleModeEnum.CanvasItems)
+                {
+                    window.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
+                }
+            }
+
+            // Hide mouse cursor on mobile touch screen to avoid NCursorManager per-touch bitmap updates
+            if (Input.MouseMode != Input.MouseModeEnum.Hidden)
+            {
+                Input.MouseMode = Input.MouseModeEnum.Hidden;
+            }
+
+            // Keep AspectRatioSetting on Auto so NGame.ApplyDisplaySettings doesn't revert to Keep (16:9 pillarboxing)
+            if (MegaCrit.Sts2.Core.Saves.SaveManager.Instance?.SettingsSave != null)
+            {
+                var settings = MegaCrit.Sts2.Core.Saves.SaveManager.Instance.SettingsSave;
+                if (settings.AspectRatioSetting != MegaCrit.Sts2.Core.Settings.AspectRatioSetting.Auto)
+                {
+                    settings.AspectRatioSetting = MegaCrit.Sts2.Core.Settings.AspectRatioSetting.Auto;
+                    if (!_fullscreenLogged)
+                    {
+                        GD.PrintErr("[STS2Bootstrapper] Set SettingsSave.AspectRatioSetting = Auto to prevent 16:9 pillarboxing.");
+                        _fullscreenLogged = true;
+                    }
                 }
             }
         }
@@ -371,24 +442,98 @@ public partial class STS2Bootstrapper : Node
             var cache = MegaCrit.Sts2.Core.Assets.PreloadManager.Cache;
             string[] essentials = new string[]
             {
+                // Core Transitions & UI Materials
                 "res://materials/transitions/fade_transition_mat.tres",
                 "res://materials/transitions/ironclad_transition_mat.tres",
+                "res://materials/ui/hover_tip_debuff.tres",
+                "res://materials/cards/banners/card_banner_common_mat.tres",
+                "res://materials/cards/banners/card_banner_uncommon_mat.tres",
+                "res://materials/cards/banners/card_banner_rare_mat.tres",
+                "res://materials/cards/frames/card_frame_red_mat.tres",
+                "res://materials/cards/frames/card_frame_colorless_mat.tres",
+
+                // Attack VFX (eliminates card play & attack lag spikes!)
+                "res://scenes/vfx/vfx_attack_slash.tscn",
+                "res://scenes/vfx/vfx_attack_blunt.tscn",
+                "res://scenes/vfx/vfx_attack_lightning.tscn",
+                "res://scenes/vfx/vfx_heavy_blunt.tscn",
+                "res://scenes/vfx/vfx_big_slash.tscn",
+                "res://scenes/vfx/vfx_big_slash_impact.tscn",
+                "res://scenes/vfx/vfx_flying_slash.tscn",
+                "res://scenes/vfx/vfx_giant_horizontal_slash.tscn",
+                "res://scenes/vfx/vfx_dagger_spray.tscn",
+                "res://scenes/vfx/vfx_dramatic_stab.tscn",
+                "res://scenes/vfx/vfx_scratch.tscn",
+                "res://scenes/vfx/vfx_bite.tscn",
                 "res://scenes/vfx/hit_spark_vfx.tscn",
+
+                // Defense & Damage VFX
+                "res://scenes/vfx/vfx_block.tscn",
+                "res://scenes/vfx/vfx_block_broken.tscn",
+                "res://scenes/vfx/vfx_blocked_text.tscn",
                 "res://scenes/vfx/block_spark_vfx.tscn",
                 "res://scenes/vfx/block_broken_vfx.tscn",
                 "res://scenes/vfx/damage_blocked_vfx.tscn",
+                "res://scenes/vfx/vfx_damage_num.tscn",
                 "res://scenes/vfx/damage_num_vfx.tscn",
+                "res://scenes/vfx/vfx_heal_num.tscn",
+                "res://scenes/vfx/vfx_cross_heal.tscn",
+                "res://scenes/vfx/vfx_monster_death.tscn",
+
+                // Powers & Combat UI VFX
+                "res://scenes/vfx/power_applied_vfx.tscn",
+                "res://scenes/vfx/power_removed_vfx.tscn",
+                "res://scenes/vfx/power_flash_vfx.tscn",
+                "res://scenes/vfx/ui/vfx_debuff_applied.tscn",
+                "res://scenes/vfx/ui/vfx_buff_applied.tscn",
+                "res://scenes/vfx/relic_flash_vfx.tscn",
+                "res://scenes/vfx/relic_inventory_flash_vfx.tscn",
+                "res://scenes/combat/power.tscn",
+                "res://scenes/combat/combat_start_banner.tscn",
+                "res://scenes/combat/player_turn_banner.tscn",
+                "res://scenes/combat/enemy_turn_banner.tscn",
+
+                // Cards & Trails
+                "res://scenes/vfx/vfx_card_fly.tscn",
+                "res://scenes/vfx/vfx_card_shuffle_fly.tscn",
+                "res://scenes/vfx/vfx_card_upgrade.tscn",
+                "res://scenes/vfx/vfx_potion_flash.tscn",
+                "res://scenes/vfx/card_trail_ironclad.tscn",
+                "res://scenes/vfx/card_trail_silent.tscn",
+                "res://scenes/vfx/card_trail_defect.tscn",
+                "res://scenes/vfx/card_trail_necrobinder.tscn",
+                "res://scenes/vfx/card_trail_regent.tscn",
                 "res://scenes/vfx/cards/card_fly_vfx.tscn",
                 "res://scenes/vfx/cards/card_fly_power_vfx.tscn",
                 "res://scenes/vfx/cards/card_fly_shuffle_vfx.tscn",
                 "res://scenes/vfx/cards/card_exhaust_vfx.tscn",
+
+                // Common Power PNGs
+                "res://images/powers/vulnerable_power.png",
+                "res://images/powers/weak_power.png",
+                "res://images/powers/frail_power.png",
+                "res://images/powers/strength_power.png",
+                "res://images/powers/ritual_power.png",
+                "res://images/powers/metallicize_power.png",
+                "res://images/powers/barricade_power.png",
+                "res://images/powers/dexterity_power.png",
+                "res://images/powers/constricted_power.png",
+                "res://images/powers/poison_power.png",
+                "res://images/powers/regen_power.png",
+                "res://images/powers/artifact_power.png",
+                "res://images/powers/intangible_power.png",
+                "res://images/powers/thorns_power.png",
+
+                // Combat Audio
                 "res://debug_audio/blunt_attack.mp3",
                 "res://debug_audio/slash_attack.mp3",
                 "res://debug_audio/heavy_attack.mp3",
                 "res://debug_audio/card_select.mp3",
                 "res://debug_audio/card_deal.mp3",
                 "res://debug_audio/player_turn.mp3",
-                "res://debug_audio/enemy_turn.mp3"
+                "res://debug_audio/enemy_turn.mp3",
+                "res://debug_audio/battle_start_1.mp3",
+                "res://debug_audio/victory.mp3"
             };
             foreach (var path in essentials)
             {
