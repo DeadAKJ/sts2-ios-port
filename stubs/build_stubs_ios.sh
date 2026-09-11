@@ -15,10 +15,20 @@ clang -arch arm64 \
     -dynamiclib \
     -O2 \
     -o "$OUT_DIR/libsteam_api.dylib" \
-    steam_stub.c steam_stub_auto.c \
+    steam_stub.c steam_stub_auto.c fmod_plugin_stub.c \
     -install_name @rpath/libsteam_api.dylib
 
 cp "$OUT_DIR/libsteam_api.dylib" "$OUT_DIR/libsteam_api64.dylib"
+
+echo "Compiling FMOD plugin stub for iOS arm64..."
+clang -arch arm64 \
+    -isysroot "$SDK_PATH" \
+    -miphoneos-version-min=15.0 \
+    -dynamiclib \
+    -O2 \
+    -o "$OUT_DIR/libfmod_plugins.dylib" \
+    fmod_plugin_stub.c \
+    -install_name @rpath/libfmod_plugins.dylib
 
 echo "Compiling Sentry stub for iOS arm64..."
 clang -arch arm64 \
