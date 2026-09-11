@@ -62,6 +62,102 @@ public partial class STS2Bootstrapper : Node
         EnforceFullscreenAndTouchSettings();
     }
 
+    // ==========================================
+    // Mobile Touch Ergonomics & Gesture Pipeline
+    // ==========================================
+    private static Vector2 _touchDownPos = Vector2.Zero;
+    private static ulong _touchDownTime = 0;
+    private static bool _touchInHandArea = false;
+    private static bool _isCardDragging = false;
+    private static bool _isMapActive = false;
+    private static bool _isMapPanning = false;
+    private static Control? _activeHoverTipSet = null;
+
+    private const float CardTouchVerticalOffset = 75f;
+    private const float MapPanThreshold = 18f;
+    private const float HandAreaThresholdProportion = 0.65f;
+
+    public override void _Input(InputEvent @event)
+    {
+        base._Input(@event);
+
+        if (@event is InputEventScreenTouch st)
+        {
+            if (st.Index == 0)
+            {
+                if (st.Pressed)
+                {
+                    _touchDownPos = st.Position;
+                    _touchDownTime = Time.GetTicksMsec();
+                    _isCardDragging = false;
+
+                    var vSize = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
+                    _touchInHandArea = st.Position.Y > (vSize.Y * HandAreaThresholdProportion);
+
+                    // Dismiss sticky tooltip if tapping outside its bounds
+                    if (_activeHoverTipSet != null && GodotObject.IsInstanceValid(_activeHoverTipSet))
+                    {
+                        var rect = _activeHoverTipSet.GetGlobalRect();
+                        if (!rect.HasPoint(st.Position))
+                        {
+                            _activeHoverTipSet = null;
+                        }
+                    }
+                }
+                else
+                {
+                    // Finger lifted
+                    if (_isMapPanning)
+                    {
+                        _isMapPanning = false;
+                        // Consume the touch up event so map points don't trigger while panning
+                        GetViewport()?.SetInputAsHandled();
+                        return;
+                    }
+
+                    _isCardDragging = false;
+                    _touchInHandArea = false;
+                }
+            }
+        }
+        else if (@event is InputEventScreenDrag sd)
+        {
+            if (sd.Index == 0)
+            {
+                float dist = sd.Position.DistanceTo(_touchDownPos);
+                if (dist > MapPanThreshold)
+                {
+                    if (_isMapActive)
+                    {
+                        _isMapPanning = true;
+                    }
+
+                    if (_touchInHandArea)
+                    {
+                        _isCardDragging = true;
+                    }
+                }
+            }
+        }
+        else if (@event is InputEventMouseMotion mm)
+        {
+            if (_isCardDragging)
+            {
+                // Shift virtual cursor position 75px upwards so thumb never blocks the card or target
+                mm.Position = new Vector2(mm.Position.X, Math.Max(10f, mm.Position.Y - CardTouchVerticalOffset));
+                mm.GlobalPosition = new Vector2(mm.GlobalPosition.X, Math.Max(10f, mm.GlobalPosition.Y - CardTouchVerticalOffset));
+            }
+        }
+        else if (@event is InputEventMouseButton mb)
+        {
+            if (_isCardDragging)
+            {
+                mb.Position = new Vector2(mb.Position.X, Math.Max(10f, mb.Position.Y - CardTouchVerticalOffset));
+                mb.GlobalPosition = new Vector2(mb.GlobalPosition.X, Math.Max(10f, mb.GlobalPosition.Y - CardTouchVerticalOffset));
+            }
+        }
+    }
+
     public void EnsureRegistered()
     {
         InitFileLogger();
@@ -250,6 +346,18 @@ public partial class STS2Bootstrapper : Node
                         _fullscreenLogged = true;
                     }
                 }
+
+                // Enable End Turn long-press confirmation bar for mobile safety
+                try
+                {
+                    var prop = settings.GetType().GetProperty("IsLongPressEnabled");
+                    if (prop != null && prop.CanWrite && !(bool)(prop.GetValue(settings) ?? false))
+                    {
+                        prop.SetValue(settings, true);
+                        GD.PrintErr("[STS2Bootstrapper] Enabled SettingsSave.IsLongPressEnabled for mobile safety.");
+                    }
+                }
+                catch { }
             }
         }
         catch { }
@@ -918,6 +1026,8 @@ public partial class STS2Bootstrapper : Node
 
             if (node is MegaCrit.Sts2.Core.Nodes.Rooms.NCombatRoom)
             {
+                _isMapActive = false;
+                _isMapPanning = false;
                 try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency; } catch { }
                 PrewarmCombatEssentials();
                 PrewarmMonsterIntents();
@@ -932,6 +1042,8 @@ public partial class STS2Bootstrapper : Node
                     _preloadedCharacters.Clear();
                     _permanentAssetCache.Clear();
                     _monsterIntentsPrewarmed = false;
+                    _isMapActive = false;
+                    _isMapPanning = false;
                     try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Interactive; } catch { }
                     try
                     {
@@ -948,6 +1060,8 @@ public partial class STS2Bootstrapper : Node
                 _preloadedCharacters.Clear();
                 _permanentAssetCache.Clear();
                 _monsterIntentsPrewarmed = false;
+                _isMapActive = false;
+                _isMapPanning = false;
                 try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Interactive; } catch { }
                 try
                 {
@@ -963,11 +1077,31 @@ public partial class STS2Bootstrapper : Node
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NMapScreen mapScreen)
             {
+                _isMapActive = true;
+                mapScreen.TreeExiting += () => { _isMapActive = false; _isMapPanning = false; };
                 try { System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.Interactive; } catch { }
                 try { GC.Collect(1, GCCollectionMode.Optimized); } catch { }
                 mapScreen.Visible = false;
                 mapScreen.ProcessMode = Node.ProcessModeEnum.Disabled;
-                GD.PrintErr("[STS2Bootstrapper] Initialized NMapScreen: Visible = false, ProcessMode = Disabled");
+                GD.PrintErr("[STS2Bootstrapper] Initialized NMapScreen: Visible = false, ProcessMode = Disabled (Map panning active)");
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NEndTurnButton endTurnBtn)
+            {
+                try
+                {
+                    if (MegaCrit.Sts2.Core.Saves.SaveManager.Instance?.SettingsSave != null)
+                    {
+                        var settings = MegaCrit.Sts2.Core.Saves.SaveManager.Instance.SettingsSave;
+                        var prop = settings.GetType().GetProperty("IsLongPressEnabled");
+                        prop?.SetValue(settings, true);
+                    }
+                    GD.PrintErr("[STS2Bootstrapper] Confirmed NEndTurnButton long-press bar active for mobile touch safety.");
+                }
+                catch { }
+            }
+            else if (node is MegaCrit.Sts2.Core.Nodes.HoverTips.NHoverTipSet hoverTipSet)
+            {
+                _activeHoverTipSet = hoverTipSet;
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Screens.Map.NBossMapPoint bossPoint)
             {
@@ -1125,6 +1259,20 @@ public partial class STS2Bootstrapper : Node
             if (hitbox != null)
             {
                 hitbox.MouseFilter = Control.MouseFilterEnum.Stop;
+
+                // Expand creature hitbox by 35% for thumb targeting accuracy on mobile screens
+                if (!hitbox.HasMeta("mobile_hitbox_expanded"))
+                {
+                    hitbox.SetMeta("mobile_hitbox_expanded", true);
+                    var originalSize = hitbox.Size;
+                    if (originalSize.X > 0 && originalSize.Y > 0)
+                    {
+                        var extra = originalSize * 0.35f;
+                        hitbox.Size = originalSize + extra;
+                        hitbox.Position -= extra / 2.0f;
+                        GD.PrintErr($"[STS2Bootstrapper] Expanded touch hitbox for {nCreature.Name} by 35% ({originalSize} -> {hitbox.Size})");
+                    }
+                }
 
                 // Disconnect original MouseExited connection to avoid hover oscillation
                 var connections = hitbox.GetSignalConnectionList(Control.SignalName.MouseExited);
