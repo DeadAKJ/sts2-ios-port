@@ -21,6 +21,9 @@ window/size/resizable=true
 window/handheld/orientation=6
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/ios/suppress_ui_gesture=true
+window/ios/hide_home_indicator=true
+window/ios/hide_status_bar=true
 
 [input_devices]
 

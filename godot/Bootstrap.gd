@@ -99,6 +99,9 @@ func launch_game() -> void:
 	await get_tree().process_frame
 	ProjectSettings.set_setting("input_devices/pointing/emulate_mouse_from_touch", true)
 	ProjectSettings.set_setting("input_devices/pointing/emulate_touch_from_mouse", true)
+	ProjectSettings.set_setting("display/window/ios/suppress_ui_gesture", true)
+	ProjectSettings.set_setting("display/window/ios/hide_home_indicator", true)
+	ProjectSettings.set_setting("display/window/ios/hide_status_bar", true)
 	
 	if has_node("/root/STS2Bootstrapper"):
 		printerr("[STS2 Bootstrap] Calling EnsureRegistered on /root/STS2Bootstrapper")

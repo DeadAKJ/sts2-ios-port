@@ -226,6 +226,11 @@ public partial class STS2Bootstrapper : Node
                 DisplayServer.WindowSetMode(DisplayServer.WindowMode.Fullscreen);
             }
 
+            // Enforce iOS system gesture suppression and home indicator auto-hide (Edge Protect)
+            ProjectSettings.SetSetting("display/window/ios/suppress_ui_gesture", true);
+            ProjectSettings.SetSetting("display/window/ios/hide_home_indicator", true);
+            ProjectSettings.SetSetting("display/window/ios/hide_status_bar", true);
+
             // Hide mouse cursor on mobile touch screen to avoid NCursorManager per-touch bitmap updates
             if (Input.MouseMode != Input.MouseModeEnum.Hidden)
             {
