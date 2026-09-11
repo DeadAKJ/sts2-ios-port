@@ -373,15 +373,139 @@ public partial class STS2Bootstrapper : Node
                 {
                     GuardCreatureVisuals(nCreature.Visuals);
                 }
+
+                // Guard hitbox and selection reticle to eliminate combat hover lag
+                nCreature.CallDeferred(Callable.From(() => GuardCreatureHitboxAndReticle(nCreature)));
             }
             else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NCreatureVisuals nVisuals)
             {
                 GuardCreatureVisuals(nVisuals);
             }
+            else if (node is MegaCrit.Sts2.Core.Nodes.Combat.NTargetManager targetManager)
+            {
+                targetManager.TargetingBegan += () => GD.PrintErr("[STS2Bootstrapper] Card targeting began");
+                targetManager.CreatureHovered += (c) => GD.PrintErr($"[STS2Bootstrapper] Creature hovered: {c?.Entity?.Name ?? c?.Name}");
+                targetManager.CreatureUnhovered += (c) => GD.PrintErr($"[STS2Bootstrapper] Creature unhovered: {c?.Entity?.Name ?? c?.Name}");
+                targetManager.TargetingEnded += () => GD.PrintErr("[STS2Bootstrapper] Card targeting ended");
+            }
         }
         catch (Exception ex)
         {
             GD.PrintErr($"[STS2Bootstrapper] Exception in OnNodeAdded: {ex}");
+        }
+    }
+
+    private static void GuardCreatureHitboxAndReticle(MegaCrit.Sts2.Core.Nodes.Combat.NCreature nCreature)
+    {
+        try
+        {
+            if (!GodotObject.IsInstanceValid(nCreature)) return;
+
+            var ncType = typeof(MegaCrit.Sts2.Core.Nodes.Combat.NCreature);
+
+            // 1. Prevent _selectionReticle and its children from intercepting touches/mouse events
+            var reticleField = ncType.GetField("_selectionReticle", BindingFlags.Instance | BindingFlags.NonPublic);
+            var reticle = reticleField?.GetValue(nCreature) as Control 
+                       ?? nCreature.GetNodeOrNull<Control>("%SelectionReticle")
+                       ?? nCreature.GetNodeOrNull<Control>("SelectionReticle");
+
+            if (reticle != null)
+            {
+                SetMouseFilterIgnoreRecursive(reticle);
+                GD.PrintErr($"[STS2Bootstrapper] Set MouseFilter=Ignore on SelectionReticle for {nCreature.Name}");
+            }
+
+            // 2. Prevent IntentContainer and Visuals from intercepting touches
+            var intents = nCreature.IntentContainer 
+                       ?? nCreature.GetNodeOrNull<Control>("%Intents")
+                       ?? nCreature.GetNodeOrNull<Control>("Intents");
+            if (intents != null)
+            {
+                SetMouseFilterIgnoreRecursive(intents);
+            }
+
+            if (nCreature.Visuals != null)
+            {
+                SetMouseFilterIgnoreRecursive(nCreature.Visuals);
+            }
+
+            // 3. Prevent HP bar from blocking creature touches
+            var stateDisplayField = ncType.GetField("_stateDisplay", BindingFlags.Instance | BindingFlags.NonPublic);
+            var stateDisplay = stateDisplayField?.GetValue(nCreature) as Control
+                            ?? nCreature.GetNodeOrNull<Control>("%HealthBar")
+                            ?? nCreature.GetNodeOrNull<Control>("HealthBar");
+            if (stateDisplay != null)
+            {
+                stateDisplay.MouseFilter = Control.MouseFilterEnum.Pass;
+                var hpBarHitbox = stateDisplay.GetNodeOrNull<Control>("%HpBarHitbox") 
+                               ?? stateDisplay.GetNodeOrNull<Control>("HpBarHitbox");
+                if (hpBarHitbox != null)
+                {
+                    hpBarHitbox.MouseFilter = Control.MouseFilterEnum.Pass;
+                }
+                var nameplate = stateDisplay.GetNodeOrNull<Control>("%NameplateContainer")
+                             ?? stateDisplay.GetNodeOrNull<Control>("NameplateContainer");
+                if (nameplate != null)
+                {
+                    SetMouseFilterIgnoreRecursive(nameplate);
+                }
+            }
+
+            // 4. Guard Hitbox against false MouseExited events
+            var hitbox = nCreature.Hitbox 
+                      ?? nCreature.GetNodeOrNull<Control>("%Hitbox")
+                      ?? nCreature.GetNodeOrNull<Control>("Hitbox");
+
+            if (hitbox != null)
+            {
+                hitbox.MouseFilter = Control.MouseFilterEnum.Stop;
+
+                // Disconnect original MouseExited connection to avoid hover oscillation
+                var connections = hitbox.GetSignalConnectionList(Control.SignalName.MouseExited);
+                foreach (var conn in connections)
+                {
+                    if (conn.ContainsKey("callable"))
+                    {
+                        var callable = conn["callable"].As<Callable>();
+                        hitbox.Disconnect(Control.SignalName.MouseExited, callable);
+                    }
+                }
+
+                var onUnfocusMethod = ncType.GetMethod("OnUnfocus", BindingFlags.Instance | BindingFlags.NonPublic);
+
+                // Connect debounced MouseExited: only unfocus if pointer has actually left the hitbox bounds
+                hitbox.Connect(Control.SignalName.MouseExited, Callable.From(() =>
+                {
+                    if (nCreature.IsInsideTree() && hitbox.IsInsideTree())
+                    {
+                        var mousePos = nCreature.GetViewport().GetMousePosition();
+                        if (hitbox.GetGlobalRect().HasPoint(mousePos))
+                        {
+                            // Finger is still physically inside monster bounds; discard false exit
+                            return;
+                        }
+                    }
+                    onUnfocusMethod?.Invoke(nCreature, null);
+                }));
+
+                GD.PrintErr($"[STS2Bootstrapper] Hitbox guarded against false exits for {nCreature.Name}");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[STS2Bootstrapper] Exception in GuardCreatureHitboxAndReticle: {ex}");
+        }
+    }
+
+    private static void SetMouseFilterIgnoreRecursive(Node node)
+    {
+        if (node is Control ctrl)
+        {
+            ctrl.MouseFilter = Control.MouseFilterEnum.Ignore;
+        }
+        foreach (var child in node.GetChildren())
+        {
+            SetMouseFilterIgnoreRecursive(child);
         }
     }
 
@@ -407,11 +531,16 @@ public partial class STS2Bootstrapper : Node
                 var bounds = visuals.GetNodeOrNull<Control>("%Bounds")
                           ?? visuals.GetNodeOrNull<Control>("Bounds")
                           ?? new Control { Name = "Bounds", CustomMinimumSize = new Vector2(100, 200) };
+                bounds.MouseFilter = Control.MouseFilterEnum.Ignore;
                 if (!bounds.IsInsideTree())
                 {
                     visuals.AddChild(bounds);
                 }
                 cvType.GetProperty("Bounds", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.SetValue(visuals, bounds);
+            }
+            else
+            {
+                visuals.Bounds.MouseFilter = Control.MouseFilterEnum.Ignore;
             }
 
             if (visuals.IntentPosition == null)
