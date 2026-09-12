@@ -73,9 +73,54 @@ public partial class STS2Bootstrapper : Node
     private static bool _isMapPanning = false;
     private static Control? _activeHoverTipSet = null;
 
+    // Mobile Right-Click (Inspect & Cancel) State
+    private static bool _longPressActive = false;
+    private static bool _longPressTriggered = false;
+    private static Vector2 _longPressStartPos = Vector2.Zero;
+    private static ulong _longPressStartTime = 0;
+
     private const float CardTouchVerticalOffset = 75f;
     private const float MapPanThreshold = 18f;
     private const float HandAreaThresholdProportion = 0.65f;
+    private const ulong LongPressDurationMs = 350;
+    private const float LongPressMovementTolerance = 15f;
+
+    public static void SimulateRightClick(Vector2 position)
+    {
+        try { Input.VibrateHandheld(25); } catch { }
+
+        // 1. Release Left Mouse Button if held down by touch emulation
+        var leftUp = new InputEventMouseButton
+        {
+            ButtonIndex = MouseButton.Left,
+            Pressed = false,
+            Position = position,
+            GlobalPosition = position
+        };
+        Input.ParseInputEvent(leftUp);
+
+        // 2. Press Right Mouse Button
+        var rightDown = new InputEventMouseButton
+        {
+            ButtonIndex = MouseButton.Right,
+            Pressed = true,
+            Position = position,
+            GlobalPosition = position
+        };
+        Input.ParseInputEvent(rightDown);
+
+        // 3. Release Right Mouse Button
+        var rightUp = new InputEventMouseButton
+        {
+            ButtonIndex = MouseButton.Right,
+            Pressed = false,
+            Position = position,
+            GlobalPosition = position
+        };
+        Input.ParseInputEvent(rightUp);
+
+        GD.PrintErr($"[STS2Bootstrapper] Simulated Right-Click (Inspect/Cancel) at {position}");
+    }
 
     public override void _Input(InputEvent @event)
     {
@@ -83,6 +128,19 @@ public partial class STS2Bootstrapper : Node
 
         if (@event is InputEventScreenTouch st)
         {
+            // Two-finger tap: instant Right-Click / Cancel
+            if (st.Index == 1 && st.Pressed)
+            {
+                GD.PrintErr("[STS2Bootstrapper] Two-finger tap detected! Simulating Right-Click (Cancel/Secondary).");
+                _longPressActive = false;
+                _longPressTriggered = false;
+                _isCardDragging = false;
+                _touchInHandArea = false;
+                SimulateRightClick(st.Position);
+                GetViewport()?.SetInputAsHandled();
+                return;
+            }
+
             if (st.Index == 0)
             {
                 if (st.Pressed)
@@ -90,6 +148,12 @@ public partial class STS2Bootstrapper : Node
                     _touchDownPos = st.Position;
                     _touchDownTime = Time.GetTicksMsec();
                     _isCardDragging = false;
+
+                    // Initialize long-press detection (Haptic Touch / Right-Click Inspect)
+                    _longPressActive = true;
+                    _longPressTriggered = false;
+                    _longPressStartPos = st.Position;
+                    _longPressStartTime = Time.GetTicksMsec();
 
                     var vSize = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
                     _touchInHandArea = st.Position.Y > (vSize.Y * HandAreaThresholdProportion);
@@ -106,13 +170,41 @@ public partial class STS2Bootstrapper : Node
                 }
                 else
                 {
-                    // Finger lifted
+                    // Primary finger lifted
+                    _longPressActive = false;
+
+                    // If long-press triggered inspection, consume finger release so no stray Left-Click occurs
+                    if (_longPressTriggered)
+                    {
+                        _longPressTriggered = false;
+                        _isCardDragging = false;
+                        _touchInHandArea = false;
+                        GetViewport()?.SetInputAsHandled();
+                        return;
+                    }
+
                     if (_isMapPanning)
                     {
                         _isMapPanning = false;
-                        // Consume the touch up event so map points don't trigger while panning
+                        // Consume touch-up event so map points don't trigger while panning
                         GetViewport()?.SetInputAsHandled();
                         return;
+                    }
+
+                    // Drag-back-down gesture to cancel card play
+                    if (_isCardDragging)
+                    {
+                        var vSize = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1920, 1080);
+                        bool releasedInHand = st.Position.Y > (vSize.Y * HandAreaThresholdProportion);
+                        if (releasedInHand)
+                        {
+                            GD.PrintErr("[STS2Bootstrapper] Card dragged back into hand area: Cancelling card play.");
+                            _isCardDragging = false;
+                            _touchInHandArea = false;
+                            SimulateRightClick(st.Position);
+                            GetViewport()?.SetInputAsHandled();
+                            return;
+                        }
                     }
 
                     _isCardDragging = false;
@@ -125,6 +217,13 @@ public partial class STS2Bootstrapper : Node
             if (sd.Index == 0)
             {
                 float dist = sd.Position.DistanceTo(_touchDownPos);
+
+                // If finger moves more than tolerance, cancel long-press
+                if (dist > LongPressMovementTolerance)
+                {
+                    _longPressActive = false;
+                }
+
                 if (dist > MapPanThreshold)
                 {
                     if (_isMapActive)
@@ -259,6 +358,19 @@ public partial class STS2Bootstrapper : Node
 
     public override void _Process(double delta)
     {
+        // Mobile Long-Press (Haptic Touch Right-Click / Inspect)
+        if (_longPressActive && !_longPressTriggered)
+        {
+            if (Time.GetTicksMsec() - _longPressStartTime >= LongPressDurationMs)
+            {
+                _longPressTriggered = true;
+                _longPressActive = false;
+                _isCardDragging = false;
+                _touchInHandArea = false;
+                SimulateRightClick(_longPressStartPos);
+            }
+        }
+
         EnforceFullscreenAndTouchSettings();
         ClearMissedCacheAssets();
 
